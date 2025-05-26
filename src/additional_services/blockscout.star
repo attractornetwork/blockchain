@@ -1,0 +1,18 @@
+blockscout_package = import_module(
+    "github.com/attractornetwork/transaction-explorer/main.star@master"
+)
+service_package = import_module("../../lib/service.star")
+
+
+def run(plan, args):
+    l2_rpc_url = service_package.get_l2_rpc_url(plan, args)
+
+    blockscout_params = {
+        "rpc_url": l2_rpc_url.http,
+        "trace_url": l2_rpc_url.http,
+        "ws_url": l2_rpc_url.ws,
+        "chain_id": str(args["zkevm_rollup_chain_id"]),
+        "deployment_suffix": args["deployment_suffix"],
+    } | args.get("blockscout_params", {})
+
+    blockscout_package.run(plan, args=blockscout_params)
