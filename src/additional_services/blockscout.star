@@ -15,7 +15,7 @@ def run(plan, args):
         "ws_url": "wss://rpc.testnet.attra.me",
         "blockscout_public_ip": "explorer.testnet.attra.me",
         "blockscot_backend_port": 50102,
-        "swap_url": "https://bridge.testnet.attra.me/",
+        "swap_url": "https://da.testnet.attra.me/",
         "l1_explorer": "https://sepolia.etherscan.io",
         "bridge_info": {
             "l1_network_id": 11155111,
