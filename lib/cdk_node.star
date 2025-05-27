@@ -56,7 +56,7 @@ def get_cdk_node_ports(args):
     # In the case where we have pre deployed contract, the cdk node
     # can go through a syncing process that takes a long time and
     # might exceed the start up time
-    aggregator_wait = "2m"
+    aggregator_wait = "15m"
     if (
         "use_previously_deployed_contracts" in args
         and args["use_previously_deployed_contracts"]

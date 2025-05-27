@@ -124,5 +124,5 @@ def _wait_for_l1_startup(plan, cl_rpc_url):
                 "done",
             ]
         ),
-        wait="5m",
+        wait="15m",
     )

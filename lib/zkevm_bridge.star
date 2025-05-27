@@ -56,7 +56,7 @@ def start_bridge_ui(plan, args, config_artifact):
 def get_bridge_ui_ports(args):
     ports = {
         "web-ui": PortSpec(
-            args["zkevm_bridge_ui_port"], application_protocol="http", wait="1m"
+            args["zkevm_bridge_ui_port"], application_protocol="http", wait="15m"
         )
     }
     public_ports = ports_package.get_public_ports(
