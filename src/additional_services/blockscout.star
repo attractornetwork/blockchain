@@ -16,11 +16,7 @@ def run(plan, args):
         "blockscout_public_ip": "explorer.testnet.attra.me",
         "blockscot_backend_port": 50102,
         "swap_url": "https://bridge.testnet.attra.me",
-        "l1_explorer": "https://sepolia.etherscan.io",
-        "bridge_info": {
-            "l1_network_id": 11155111,
-            "l2_network_id": 9701,
-        }
+        "l1_explorer": "https://sepolia.etherscan.io"
     } | args.get("blockscout_params", {})
 
     blockscout_package.run(plan, args=blockscout_params)
