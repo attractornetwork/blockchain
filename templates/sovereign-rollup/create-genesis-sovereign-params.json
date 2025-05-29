@@ -12,8 +12,16 @@
     "setPreMintAccounts": true,
     "preMintAccounts": [
         {
-            "balance": "1000000000000000000",
+            "balance": "1000000000000000000000",
             "address": "0x8576158a89648aA88B6036f47B8b74Fc0C2b5c66"
+        },
+        {
+            "balance": "1000000000000000000000",
+            "address": "0xE36d90731fc70703e43de7a6F983510f4AFd1869"
+        },
+        {
+            "balance": "1000000000000000000000",
+            "address": "0x52C5693A8a1f793E318D3Ea5c1cC69B539430Ad7"
         }
     ],
     "setTimelockParameters": true,

@@ -272,7 +272,7 @@ DEFAULT_L2_ARGS = {
     # polycli wallet inspect --mnemonic '{{.l1_preallocated_mnemonic}}'
     "l2_accounts_to_fund": 10,
     # The amount of ETH sent to each of the prefunded l2 accounts.
-    "l2_funding_amount": "100ether",
+    "l2_funding_amount": "1000ether",
     # Whether to deploy https://github.com/Arachnid/deterministic-deployment-proxy.
     # Not deploying this will may cause errors or short circuit other contract
     # deployments.
