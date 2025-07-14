@@ -82,19 +82,19 @@ EnableL2SuggestedGasPricePolling = true
                 Port = {{.zkevm_rpc_ws_port}}
 
 [Synchronizer]
-SyncInterval = "1s"
-SyncChunkSize = 100
+SyncInterval = "60s"
+SyncChunkSize = 1000
 TrustedSequencerURL = "" # If it is empty or not specified, then the value is read from the smc.
 L1SynchronizationMode = "sequential"
         [Synchronizer.L1ParallelSynchronization]
                 MaxClients = 10
                 MaxPendingNoProcessedBlocks = 25
-                RequestLastBlockPeriod = "5s"
+                RequestLastBlockPeriod = "120s"
                 RequestLastBlockTimeout = "5s"
                 RequestLastBlockMaxRetries = 3
                 StatisticsPeriod = "5m"
                 TimeoutMainLoop = "5m"
-                RollupInfoRetriesSpacing= "5s"
+                RollupInfoRetriesSpacing= "60s"
                 FallbackToSequentialModeOnSynchronized = false
                 [Synchronizer.L1ParallelSynchronization.PerformanceWarning]
                         AceptableInacctivityTime = "5s"
