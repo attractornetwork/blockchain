@@ -6,7 +6,7 @@ Outputs = ["stdout"]
 [SequenceSender]
 IsValidiumMode={{.zkevm_is_validium}}
 WaitPeriodSendSequence = "3600s"
-LastBatchVirtualizationTimeMaxWaitPeriod = "10s"
+LastBatchVirtualizationTimeMaxWaitPeriod = "4h"
 MaxTxSizeForL1 = 131072
 L2Coinbase =  "{{.zkevm_l2_sequencer_address}}"
 PrivateKey = {Path = "/etc/zkevm/sequencer.keystore", Password = "{{.zkevm_l2_keystore_password}}"}
