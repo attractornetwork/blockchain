@@ -913,7 +913,7 @@ L1InfoTreeCheckInterval = "3600s"
 # BatchMaxDeltaTimestamp determines the max amount of time that a
 # batch will be held open assuming it's not empty.
 # ------------------------------------------------------------------------------
-BatchMaxDeltaTimestamp = "4h"
+BatchMaxDeltaTimestamp = "24h"
 
 # ------------------------------------------------------------------------------
 # L2BlockMaxDeltaTimestamp is used to set the L2 block interval.
