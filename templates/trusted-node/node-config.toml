@@ -234,7 +234,7 @@ IntervalToRefreshBlockedAddresses = "5m"
 # probably be in line with the configured frequency for the
 # L2GaspriceSuggester's update period
 # ------------------------------------------------------------------------------
-IntervalToRefreshGasPrices = "10s"
+IntervalToRefreshGasPrices = "3600s"
 
 # ------------------------------------------------------------------------------
 # MaxTxBytesSize configures the RPC limit for the max size of a
@@ -265,7 +265,7 @@ DefaultMinGasPriceAllowed = 1000000000
 # interval is very long. If we want to be more reactive to the L1 gas
 # price, this can be configured for a shorter duration.
 # ------------------------------------------------------------------------------
-MinAllowedGasPriceInterval = "5m"
+MinAllowedGasPriceInterval = "600m"
 
 # ------------------------------------------------------------------------------
 # PollMinAllowedGasPriceInterval works in tandem with
@@ -275,7 +275,7 @@ MinAllowedGasPriceInterval = "5m"
 # price. We'll then update the current suggested gas price in our pool
 # with that value.
 # ------------------------------------------------------------------------------
-PollMinAllowedGasPriceInterval = "15s"
+PollMinAllowedGasPriceInterval = "3600s"
 
 # ------------------------------------------------------------------------------
 # AccountQueue determines how many non-executable transactions can be
@@ -834,7 +834,7 @@ DeletePoolTxsCheckInterval = "12h0m0s"
 # TxLifetimeCheckInterval determines how often we'll check the current
 # txs in the pool to see if they have exceeded their lifetime
 # ------------------------------------------------------------------------------
-TxLifetimeCheckInterval = "10m0s"
+TxLifetimeCheckInterval = "1000m0s"
 
 # ------------------------------------------------------------------------------
 # TxLifetimeMax determines how long a non-executable transaction can
@@ -846,7 +846,7 @@ TxLifetimeMax = "3h0m0s"
 # LoadPoolTxsCheckInterval determines how frequently the sequencer
 # will check to see if there are new transactions in the pool
 # ------------------------------------------------------------------------------
-LoadPoolTxsCheckInterval = "500ms"
+LoadPoolTxsCheckInterval = "3600s"
 
 # ------------------------------------------------------------------------------
 # StateConsistencyCheckInterval determines how long the sequencer will
@@ -856,7 +856,7 @@ LoadPoolTxsCheckInterval = "500ms"
 # inconsistency develops, the finalizer will halt requiring a cleanup
 # / restart.
 # ------------------------------------------------------------------------------
-StateConsistencyCheckInterval = "500s"
+StateConsistencyCheckInterval = "3600s"
 
 [Sequencer.Finalizer]
 
@@ -870,7 +870,7 @@ ForcedBatchesTimeout = "64m0s"
 # NewTxsWaitInterval is the duration the finalizer will sleep between
 # iterations if there are no pending transactions to be processed.
 # ------------------------------------------------------------------------------
-NewTxsWaitInterval = "100ms"
+NewTxsWaitInterval = "3600s"
 
 # ------------------------------------------------------------------------------
 # ResourceExhaustedMarginPct is used to determine how much wiggle room
@@ -964,7 +964,7 @@ SequentialProcessL2Block = false
 # ------------------------------------------------------------------------------
 # Interval determines the duration for L2 Blocks to be included for event
 # ------------------------------------------------------------------------------
-Interval = "1h0m0s"
+Interval = "36h0m0s"
 
 # ------------------------------------------------------------------------------
 # EnableLog will enable or disable the metrics logs
@@ -1158,7 +1158,7 @@ RetryTime = "30s"
 # VerifyProofInterval is the interval of time to verify and send
 # proofs to L1
 # ------------------------------------------------------------------------------
-VerifyProofInterval = "1m0s"
+VerifyProofInterval = "12h0m0s"
 
 # ------------------------------------------------------------------------------
 # ProofStatePollingInterval will determine how long we wait between
@@ -1218,7 +1218,7 @@ ForkId = 0
 # CleanupLockedProofsInterval determines the wait duration between
 # successive calls to clean up locked proofs.
 # ------------------------------------------------------------------------------
-CleanupLockedProofsInterval = "2m0s"
+CleanupLockedProofsInterval = "12h0m0s"
 
 # ------------------------------------------------------------------------------
 # GeneratingProofCleanupThreshold determines the max amount of time

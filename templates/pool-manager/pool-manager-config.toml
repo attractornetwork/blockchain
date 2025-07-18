@@ -24,7 +24,7 @@ MaxConns = 200
 
 [Sender]
 SequencerURL = "http://cdk-erigon-sequencer{{.deployment_suffix}}:{{.zkevm_rpc_http_port}}"
-ResendTxsCheckInterval = "60s"
+ResendTxsCheckInterval = "3600s"
 Workers = 5
 QueueSize = 25
 
@@ -32,6 +32,6 @@ QueueSize = 25
 L2NodeURL = "http://cdk-erigon-rpc{{.deployment_suffix}}:{{.zkevm_rpc_http_port}}"
 Workers = 5
 QueueSize = 25
-RetryWaitInterval = "60s"
-InitialWaitInterval = "60s"
+RetryWaitInterval = "3600s"
+InitialWaitInterval = "3600s"
 TxLifeTimeMax = "300s"

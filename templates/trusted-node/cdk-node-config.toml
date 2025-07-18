@@ -55,7 +55,7 @@ Outputs = ["stderr"]
 [Aggregator]
         Port = "{{.zkevm_aggregator_port}}"
         RetryTime = "30s"
-        VerifyProofInterval = "10s"
+        VerifyProofInterval = "3600s"
         GasOffset = 150000
         SettlementBackend = "agglayer"
         [Aggregator.DB]
@@ -68,5 +68,5 @@ Outputs = ["stderr"]
                 MaxConns = 200
        
 [AggSender]
-CertificateSendInterval = "1m"
-CheckSettledInterval = "5s"
+CertificateSendInterval = "120m"
+CheckSettledInterval = "3600s"
