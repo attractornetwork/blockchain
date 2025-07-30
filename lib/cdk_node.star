@@ -84,20 +84,27 @@ def get_cdk_node_ports(args):
 def get_cdk_node_cmd(args):
     binary_name = args.get("binary_name")
 
-    service_command = [
-        "sleep 20 && cdk-node run "
-        + "--cfg=/etc/cdk/cdk-node-config.toml "
-        + "--custom-network-file=/etc/cdk/genesis.json "
-        + "--components=sequence-sender,aggregator"
-    ]
-
-    if args["consensus_contract_type"] == constants.CONSENSUS_TYPE.pessimistic:
+    if args["consensus_contract_type"] == constants.CONSENSUS_TYPE.cdk_validium:
+        service_command = [
+            "sleep 20 && cdk-node run "
+            + "--cfg=/etc/cdk/cdk-node-config.toml "
+            + "--custom-network-file=/etc/cdk/genesis.json "
+            + "--components="
+        ]
+    elif args["consensus_contract_type"] == constants.CONSENSUS_TYPE.pessimistic:
         service_command = [
             "sleep 20 && cdk-node run "
             + "--cfg=/etc/cdk/cdk-node-config.toml "
             + "--custom-network-file=/etc/cdk/genesis.json "
             + "--save-config-path=/tmp/ "
             + "--components=aggsender"
+        ]
+    else:
+        service_command = [
+            "sleep 20 && cdk-node run "
+            + "--cfg=/etc/cdk/cdk-node-config.toml "
+            + "--custom-network-file=/etc/cdk/genesis.json "
+            + "--components=aggregator"
         ]
 
     if binary_name == AGGKIT_BINARY_NAME:
