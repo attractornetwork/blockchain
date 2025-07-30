@@ -100,7 +100,7 @@ def run(plan, args, deployment_stages, contract_setup_addresses):
             description="Starting the DAC",
         )
 
-    if args["sequencer_type"] == "erigon":
+    if args["sequencer_type"] == "erigon" and args["consensus_contract_type"] == constants.CONSENSUS_TYPE.pessimistic:
         agglayer_endpoint = get_agglayer_endpoint(plan, args, deployment_stages)
         # Create the cdk node config.
         node_config_template = read_file(
