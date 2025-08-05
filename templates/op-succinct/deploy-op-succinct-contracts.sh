@@ -13,7 +13,7 @@ wait_for_rpc_to_be_available() {
             echo_ts "Exceeded maximum retry attempts. Exiting."
             exit 1
         fi
-        sleep 3600
+        sleep 5
     done
 }
 
