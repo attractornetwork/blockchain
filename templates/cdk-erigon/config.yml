@@ -285,7 +285,7 @@ zkevm.sequencer-block-seal-time: 3s
 # Longer times allow more blocks (and more txs) per batch, potentially improving efficiency,
 # but may increase overall transaction confirmation time.
 # Default: 12s
-zkevm.sequencer-batch-seal-time: 43200s
+zkevm.sequencer-batch-seal-time: 15s
 
 # Seal the batch immediately when detecting a counter overflow
 # This setting can be helpful to close batches faster while testing with a single account.

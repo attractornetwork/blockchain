@@ -857,7 +857,7 @@ LoadPoolTxsCheckInterval = "500ms"
 # inconsistency develops, the finalizer will halt requiring a cleanup
 # / restart.
 # ------------------------------------------------------------------------------
-StateConsistencyCheckInterval = "500s"
+StateConsistencyCheckInterval = "5s"
 
 [Sequencer.Finalizer]
 
@@ -865,7 +865,7 @@ StateConsistencyCheckInterval = "500s"
 # ForcedBatchesTimeout is the time the finalizer waits after receiving
 # the closing signal to process forced batches.
 # ------------------------------------------------------------------------------
-ForcedBatchesTimeout = "64m0s"
+ForcedBatchesTimeout = "1m0s"
 
 # ------------------------------------------------------------------------------
 # NewTxsWaitInterval is the duration the finalizer will sleep between
@@ -890,13 +890,13 @@ ResourceExhaustedMarginPct = 10
 # ForcedBatchesL1BlockConfirmations is used to determine finality for
 # processing of forced batches.
 # ------------------------------------------------------------------------------
-ForcedBatchesL1BlockConfirmations = 640
+ForcedBatchesL1BlockConfirmations = 64
 
 # ------------------------------------------------------------------------------
 # L1InfoTreeL1BlockConfirmations is used to determine finality for
 # processing of deposits to the l1 info tree
 # ------------------------------------------------------------------------------
-L1InfoTreeL1BlockConfirmations = 640
+L1InfoTreeL1BlockConfirmations = 64
 
 # ------------------------------------------------------------------------------
 # ForcedBatchesCheckInterval is the duration that the application will
@@ -1053,7 +1053,7 @@ Level = "{{.global_log_level}}"
 # we checked. E.g. if we query and find 0 sequences to send, we'll
 # wait for WaitPeriodSendSequence before checking again
 # ------------------------------------------------------------------------------
-WaitPeriodSendSequence = "21600s"
+WaitPeriodSendSequence = "5s"
 
 # ------------------------------------------------------------------------------
 # LastBatchVirtualizationTimeMaxWaitPeriod defines the max amount of
@@ -1101,7 +1101,7 @@ GasOffset = 150000
 # verified faster, decreasing this number will help ensure that you're
 # sequencing more often.
 # ------------------------------------------------------------------------------
-MaxBatchesForL1 = 10000
+MaxBatchesForL1 = 1000
 
 # ------------------------------------------------------------------------------
 # L2Coinbase should generally be the address of the trusted
