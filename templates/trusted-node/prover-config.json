@@ -232,7 +232,7 @@
      * `requestsPersistence' will be purged every
      * `cleanerPollingPeriod' seconds
      */ -}}
-    "cleanerPollingPeriod": 600,
+    "cleanerPollingPeriod": 12000,
 
 {{- /*
      * requestsPersistence is the amount of time that completed

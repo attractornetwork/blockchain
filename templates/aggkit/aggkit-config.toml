@@ -294,7 +294,7 @@ PrivateKeys = [{Path = "/etc/aggkit/aggoracle.keystore", Password = "{{.zkevm_l2
 # FrequencyToMonitorTxs frequency of the resending failed txs
 # Duration expressed in units: [ns, us, ms, s, m, h, d]"
 # ------------------------------------------------------------------------------
-# FrequencyToMonitorTxs = "1s"
+# FrequencyToMonitorTxs = "86400s"
 
 # ------------------------------------------------------------------------------
 # WaitTxToBeMined time to wait after transaction was sent to the ethereum
