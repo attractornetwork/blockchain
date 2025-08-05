@@ -914,7 +914,7 @@ L1InfoTreeCheckInterval = "3600s"
 # BatchMaxDeltaTimestamp determines the max amount of time that a
 # batch will be held open assuming it's not empty.
 # ------------------------------------------------------------------------------
-BatchMaxDeltaTimestamp = "4h"
+BatchMaxDeltaTimestamp = "2m"
 
 # ------------------------------------------------------------------------------
 # L2BlockMaxDeltaTimestamp is used to set the L2 block interval.
@@ -1062,7 +1062,7 @@ WaitPeriodSendSequence = "5s"
 # LastBatchVirtualizationTimeMaxWaitPeriod since the last time we've
 # virtualized, we'll send the sequences. Otherwise we'll wait longer.
 # ------------------------------------------------------------------------------
-LastBatchVirtualizationTimeMaxWaitPeriod = "4h"
+LastBatchVirtualizationTimeMaxWaitPeriod = "15m"
 
 # ------------------------------------------------------------------------------
 # L1BlockTimestampMargin is the duration that must exist between the
@@ -1101,7 +1101,7 @@ GasOffset = 150000
 # verified faster, decreasing this number will help ensure that you're
 # sequencing more often.
 # ------------------------------------------------------------------------------
-MaxBatchesForL1 = 1000
+MaxBatchesForL1 = 15
 
 # ------------------------------------------------------------------------------
 # L2Coinbase should generally be the address of the trusted
