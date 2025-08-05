@@ -78,7 +78,7 @@
     "dbProgramCacheSize": 512,
     "dbNumberOfPoolConnections": 30,
     "dbGetTree": true,
-    "cleanerPollingPeriod": 600,
+    "cleanerPollingPeriod": 12000,
     "requestsPersistence": 3600,
     "maxExecutorThreads": 20,
     "maxProverThreads": 8,
