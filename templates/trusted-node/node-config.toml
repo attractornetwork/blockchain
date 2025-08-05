@@ -527,7 +527,7 @@ MaxLogsCount = 1000
 # max range for block number when querying TXslogs in a single call to
 # the state, if zero it means no limit
 # ------------------------------------------------------------------------------
-MaxLogsBlockRange = 10
+MaxLogsBlockRange = 1000
 
 # ------------------------------------------------------------------------------
 # MaxNativeBlockHashBlockRange is a configuration to set the max range
@@ -651,7 +651,7 @@ SyncInterval = "86400s"
 # SyncChunkSize determines how large of a range of blocks we'll
 # attempt to pull while getting the rollup information.
 # ------------------------------------------------------------------------------
-SyncChunkSize = 1000
+SyncChunkSize = 100
 
 # ------------------------------------------------------------------------------
 # TrustedSequencerURL is the RPC url to connect to in order to sync
@@ -671,8 +671,8 @@ TrustedSequencerURL = ""
 # This value is configured for latest to speed up testing in the local
 # environment but this is not recommened for production environments
 # ------------------------------------------------------------------------------
-SyncBlockProtection = "safe"
-# SyncBlockProtection = "finalized"
+# SyncBlockProtection = "safe"
+SyncBlockProtection = "finalized"
 # SyncBlockProtection = "latest"
 
 # ------------------------------------------------------------------------------
@@ -725,13 +725,13 @@ RequestLastBlockPeriod = "86400s"
 # RequestLastBlockTimeout determines a maximum duration that we'll
 # wait for a response when requesting a new block.
 # ------------------------------------------------------------------------------
-RequestLastBlockTimeout = "21600s"
+RequestLastBlockTimeout = "300s"
 
 # ------------------------------------------------------------------------------
 # RequestLastBlockMaxRetries can be used to define the max number of
 # retries to request the L1 block
 # ------------------------------------------------------------------------------
-RequestLastBlockMaxRetries = 1
+RequestLastBlockMaxRetries = 3
 
 # ------------------------------------------------------------------------------
 # StatisticsPeriod defines how often we should show a log with
@@ -796,8 +796,8 @@ ReprocessFullBatchOnClose = false
 CheckLastL2BlockHashOnCloseBatch = true
 
 # TODO - use the defaults for now
-[Synchronizer.L1BlockCheck]
-Enabled = false
+# [Synchronizer.L1BlockCheck]
+# Enabled = true
 
 # L1SafeBlockPoint = "latest"
 # L1SafeBlockOffset = 0
