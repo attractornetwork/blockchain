@@ -151,7 +151,7 @@ Url = ""
 # Setting this duration can potentially create a lot of logs
 # especially if there is nothing to do.
 # ------------------------------------------------------------------------------
-FrequencyToMonitorTxs = "21600s"
+FrequencyToMonitorTxs = "3600s"
 
 # ------------------------------------------------------------------------------
 # WaitTxToBeMined will determine how long we'll wait for a transaction
@@ -162,7 +162,7 @@ FrequencyToMonitorTxs = "21600s"
 # The code for sending transactions does not create a goroutine. It
 # will block for the duration of the wait.
 # ------------------------------------------------------------------------------
-WaitTxToBeMined = "12h"
+WaitTxToBeMined = "2h"
 
 # ------------------------------------------------------------------------------
 # ForcedGas can be used to configure a default gas limit to use in the
@@ -645,7 +645,7 @@ MaxSHA256Hashes = 0
 # controls how long we wait between running sync operations and not
 # the frequence of syncs.
 # ------------------------------------------------------------------------------
-SyncInterval = "21600s"
+SyncInterval = "3600s"
 
 # ------------------------------------------------------------------------------
 # SyncChunkSize determines how large of a range of blocks we'll
@@ -689,7 +689,7 @@ L1SyncCheckL2BlockHash = false
 # L1SyncCheckL2BlockHash is also enabled. E.g. if this value is set to
 # 30, we'll trigger the checks every 30th L2 block.
 # ------------------------------------------------------------------------------
-L1SyncCheckL2BlockNumberhModulus = 100000
+L1SyncCheckL2BlockNumberhModulus = 10000
 
 # ------------------------------------------------------------------------------
 # L1SynchronizationMode determines which mode of synchronization we
@@ -705,7 +705,7 @@ L1SynchronizationMode = "sequential"
 # MaxClients determines how many workers we'll spawn in order to read
 # L1 data and synchronize.
 # ------------------------------------------------------------------------------
-MaxClients = 1
+MaxClients = 2
 
 # ------------------------------------------------------------------------------
 # MaxPendingNoProcessedBlocks determines the size of the buffer used
@@ -713,19 +713,19 @@ MaxClients = 1
 # equal to the MaxClients number. The suggested configuration is at 2x
 # the number of MaxClients.
 # ------------------------------------------------------------------------------
-MaxPendingNoProcessedBlocks = 2
+MaxPendingNoProcessedBlocks = 4
 
 # ------------------------------------------------------------------------------
 # RequestLastBlockPeriod determines how long we'll wait to request a
 # new block from L1 assuming that we're already in sync.
 # ------------------------------------------------------------------------------
-RequestLastBlockPeriod = "21600s"
+RequestLastBlockPeriod = "3600s"
 
 # ------------------------------------------------------------------------------
 # RequestLastBlockTimeout determines a maximum duration that we'll
 # wait for a response when requesting a new block.
 # ------------------------------------------------------------------------------
-RequestLastBlockTimeout = "300s"
+RequestLastBlockTimeout = "60s"
 
 # ------------------------------------------------------------------------------
 # RequestLastBlockMaxRetries can be used to define the max number of
@@ -737,19 +737,19 @@ RequestLastBlockMaxRetries = 3
 # StatisticsPeriod defines how often we should show a log with
 # stats. Set this to 0 in order to disable all together.
 # ------------------------------------------------------------------------------
-StatisticsPeriod = "12h"
+StatisticsPeriod = "2h"
 
 # ------------------------------------------------------------------------------
 # TimeOutMainLoop determines how long we'll wait for the main
 # synchronizer loop to complete
 # ------------------------------------------------------------------------------
-TimeOutMainLoop = "12h"
+TimeOutMainLoop = "2h"
 
 # ------------------------------------------------------------------------------
 # RollupInfoRetriesSpacing determines the duration that we'll wait
 # between successive retries to fetch L1 data.
 # ------------------------------------------------------------------------------
-RollupInfoRetriesSpacing = "21600s"
+RollupInfoRetriesSpacing = "3600s"
 
 # ------------------------------------------------------------------------------
 # FallbackToSequentialModeOnSynchronized if true the synchronizer will
@@ -766,7 +766,7 @@ FallbackToSequentialModeOnSynchronized = false
 # much as possible, so if the producer is not fast enough then you
 # could increase the number of parallel clients to sync with L1
 # ------------------------------------------------------------------------------
-AceptableInacctivityTime = "1800s"
+AceptableInacctivityTime = "300s"
 
 # ------------------------------------------------------------------------------
 # ApplyAfterNumRollupReceived configures a minimum number of processed
@@ -902,19 +902,19 @@ L1InfoTreeL1BlockConfirmations = 64
 # ForcedBatchesCheckInterval is the duration that the application will
 # sleep between checks for forced batches on L1
 # ------------------------------------------------------------------------------
-ForcedBatchesCheckInterval = "21600s"
+ForcedBatchesCheckInterval = "3600s"
 
 # ------------------------------------------------------------------------------
 # L1InfoTreeCheckInterval is the duration that the application will
 # sleep between checks for updates to the L1 info tree
 # ------------------------------------------------------------------------------
-L1InfoTreeCheckInterval = "21600s"
+L1InfoTreeCheckInterval = "3600s"
 
 # ------------------------------------------------------------------------------
 # BatchMaxDeltaTimestamp determines the max amount of time that a
 # batch will be held open assuming it's not empty.
 # ------------------------------------------------------------------------------
-BatchMaxDeltaTimestamp = "144h"
+BatchMaxDeltaTimestamp = "24h"
 
 # ------------------------------------------------------------------------------
 # L2BlockMaxDeltaTimestamp is used to set the L2 block interval.
@@ -1062,7 +1062,7 @@ WaitPeriodSendSequence = "5s"
 # LastBatchVirtualizationTimeMaxWaitPeriod since the last time we've
 # virtualized, we'll send the sequences. Otherwise we'll wait longer.
 # ------------------------------------------------------------------------------
-LastBatchVirtualizationTimeMaxWaitPeriod = "144h"
+LastBatchVirtualizationTimeMaxWaitPeriod = "4h"
 
 # ------------------------------------------------------------------------------
 # L1BlockTimestampMargin is the duration that must exist between the
@@ -1165,7 +1165,7 @@ VerifyProofInterval = "1m0s"
 # ProofStatePollingInterval will determine how long we wait between
 # successive checks to see if a pending proof has been finished
 # ------------------------------------------------------------------------------
-ProofStatePollingInterval = "21600s"
+ProofStatePollingInterval = "3600s"
 
 # ------------------------------------------------------------------------------
 # TxProfitabilityCheckerType is used to specify an approach for
