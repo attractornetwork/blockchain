@@ -48,9 +48,9 @@ max-decoding-message-size = 104857600
 
 [outbound.rpc.settle]
 max-retries = 3
-retry-interval = 36
+retry-interval = 7
 confirmations = 1
-settlement-timeout = 3600
+settlement-timeout = 1200
 
 [log]
 # level = "{{.global_log_level}}"

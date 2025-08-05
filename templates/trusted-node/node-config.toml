@@ -151,7 +151,7 @@ Url = ""
 # Setting this duration can potentially create a lot of logs
 # especially if there is nothing to do.
 # ------------------------------------------------------------------------------
-FrequencyToMonitorTxs = "60s"
+FrequencyToMonitorTxs = "5s"
 
 # ------------------------------------------------------------------------------
 # WaitTxToBeMined will determine how long we'll wait for a transaction
@@ -645,7 +645,7 @@ MaxSHA256Hashes = 0
 # controls how long we wait between running sync operations and not
 # the frequence of syncs.
 # ------------------------------------------------------------------------------
-SyncInterval = "60s"
+SyncInterval = "1s"
 
 # ------------------------------------------------------------------------------
 # SyncChunkSize determines how large of a range of blocks we'll
@@ -672,8 +672,8 @@ TrustedSequencerURL = ""
 # environment but this is not recommened for production environments
 # ------------------------------------------------------------------------------
 # SyncBlockProtection = "safe"
-SyncBlockProtection = "finalized"
-# SyncBlockProtection = "latest"
+# SyncBlockProtection = "finalized"
+SyncBlockProtection = "latest"
 
 # ------------------------------------------------------------------------------
 # L1SyncCheckL2BlockHash will perform additional hash checks between a
@@ -719,7 +719,7 @@ MaxPendingNoProcessedBlocks = 25
 # RequestLastBlockPeriod determines how long we'll wait to request a
 # new block from L1 assuming that we're already in sync.
 # ------------------------------------------------------------------------------
-RequestLastBlockPeriod = "120s"
+RequestLastBlockPeriod = "5s"
 
 # ------------------------------------------------------------------------------
 # RequestLastBlockTimeout determines a maximum duration that we'll
@@ -1165,7 +1165,7 @@ VerifyProofInterval = "1m0s"
 # ProofStatePollingInterval will determine how long we wait between
 # successive checks to see if a pending proof has been finished
 # ------------------------------------------------------------------------------
-ProofStatePollingInterval = "60s"
+ProofStatePollingInterval = "5s"
 
 # ------------------------------------------------------------------------------
 # TxProfitabilityCheckerType is used to specify an approach for
