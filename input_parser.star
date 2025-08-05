@@ -36,6 +36,9 @@ DEFAULT_DEPLOYMENT_STAGES = {
     "deploy_op_succinct": False,
     # Deploy contracts on L2 (as well as fund accounts).
     "deploy_l2_contracts": False,
+    # Use cdk-node as sequencer. Please turn on this flag when you want to use cdk-node as sequencer on production.
+    # For testnet, you can use cdk-erigon without cdk-node and save your money for L1 requests.
+    "use_cdk_node_as_sequencer": False,
 }
 
 DEFAULT_IMAGES = {
