@@ -431,7 +431,7 @@ DEFAULT_ARGS = (
         # - status_checker
         # - test_runner
         # - tx_spammer
-        "additional_services": [],
+        "additional_services": [constants.ADDITIONAL_SERVICES.test_runner],
         # Only relevant when deploying to an external L1.
         "polygon_zkevm_explorer": "https://explorer.private/",
         "l1_explorer_url": "https://sepolia.etherscan.io/",

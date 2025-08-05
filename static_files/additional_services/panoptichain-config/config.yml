@@ -5,12 +5,14 @@ http:
 
 providers:
   system:
+    # attra-TODO: please set the interval to 120s for production-ready deployment.
     interval: 3600s
 
   rpc:
     - name: "L1"
       url: "{{.l1_rpc_url}}"
       label: "L1"
+      # attra-TODO: please set the interval to NONE for production-ready deployment.
       interval: 3600s
       contracts:
         rollup_manager_address: "{{.zkevm_rollup_manager_address}}"
@@ -37,6 +39,7 @@ providers:
     - name: "L2"
       url: "{{.l2_rpc_url}}"
       label: "L2"
+      # attra-TODO: please set the interval to NONE for production-ready deployment.
       interval: 3600s
       contracts:
         global_exit_root_l2_address: "{{.zkevm_global_exit_root_l2_address}}"

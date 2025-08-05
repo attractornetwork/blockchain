@@ -54,7 +54,7 @@ Outputs = ["stderr"]
 
 [Aggregator]
         Port = "{{.zkevm_aggregator_port}}"
-        RetryTime = "3600s"
+        RetryTime = "30s"
         VerifyProofInterval = "3600s"
         GasOffset = 150000
         SettlementBackend = "agglayer"
