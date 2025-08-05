@@ -36,8 +36,8 @@ IntervalToRefreshGasPrices = "5s"
 MaxTxBytesSize=100132
 MaxTxDataBytesSize=100000
 DefaultMinGasPriceAllowed = 1000000000
-MinAllowedGasPriceInterval = "360m"
-PollMinAllowedGasPriceInterval = "3600s"
+MinAllowedGasPriceInterval = "5m"
+PollMinAllowedGasPriceInterval = "15s"
 AccountQueue = 64
 GlobalQueue = 1024
         [Pool.EffectiveGasPrice]
