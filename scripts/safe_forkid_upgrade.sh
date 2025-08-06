@@ -67,17 +67,17 @@ if ! command -v cast &> /dev/null; then
 fi
 
 # Check current forkid
-echo "=== Checking current forkid ==="
-CURRENT_FORKID=$(cast rpc --json --rpc-url $(kurtosis port print "$ENCLAVE_NAME" $SVC_RPC rpc) zkevm_getForkId | jq -r "tonumber")
-echo "Current forkid: $CURRENT_FORKID"
-if [ "$CURRENT_FORKID" -ne "$SOURCE_FORKID" ]; then
-    echo "WARNING: Current forkid ($CURRENT_FORKID) doesn't match expected source forkid ($SOURCE_FORKID)"
-    read -p "Continue anyway? (y/N): " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        exit 1
-    fi
-fi
+# echo "=== Checking current forkid ==="
+# CURRENT_FORKID=$(cast rpc --json --rpc-url $(kurtosis port print "$ENCLAVE_NAME" $SVC_RPC rpc) zkevm_getForkId | jq -r "tonumber")
+# echo "Current forkid: $CURRENT_FORKID"
+# if [ "$CURRENT_FORKID" -ne "$SOURCE_FORKID" ]; then
+#     echo "WARNING: Current forkid ($CURRENT_FORKID) doesn't match expected source forkid ($SOURCE_FORKID)"
+#     read -p "Continue anyway? (y/N): " -n 1 -r
+#     echo
+#     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+#         exit 1
+#     fi
+# fi
 
 # Create backup
 echo ""
