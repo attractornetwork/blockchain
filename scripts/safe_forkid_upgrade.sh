@@ -30,6 +30,7 @@ SVC_CDKNODE=cdk-node-001
 SVC_PROVER=zkevm-prover-001
 SVC_BRIDGE=zkevm-bridge-service-001
 SVC_SLESS_EXECUTOR=zkevm-stateless-executor-001
+SVC_POSTGRES=postgres-001
 
 # Determine target contract tag
 if [ "$TARGET_FORKID" -eq "11" ]; then
@@ -57,6 +58,14 @@ if ! kurtosis enclave ls | grep -q "$ENCLAVE_NAME"; then
     exit 1
 fi
 
+# Check if cast is available
+if ! command -v cast &> /dev/null; then
+    echo "ERROR: 'cast' command not found. Please install foundry:"
+    echo "curl -L https://foundry.paradigm.xyz | bash"
+    echo "foundryup"
+    exit 1
+fi
+
 # Check current forkid
 echo "=== Checking current forkid ==="
 CURRENT_FORKID=$(cast rpc --json --rpc-url $(kurtosis port print "$ENCLAVE_NAME" $SVC_RPC rpc) zkevm_getForkId | jq -r)
@@ -77,16 +86,61 @@ BACKUP_DIR="/tmp/forkid_upgrade_backup_$(date +%Y%m%d_%H%M%S)"
 echo "Creating backup in: $BACKUP_DIR"
 mkdir -p "$BACKUP_DIR"
 
-# Backup database data
-echo "Backing up databases..."
-kurtosis service exec "$ENCLAVE_NAME" postgres-001 "pg_dump -U postgres -d zkevm_node > /tmp/zkevm_node_backup.sql"
-kurtosis service exec "$ENCLAVE_NAME" postgres-001 "pg_dump -U postgres -d zkevm_prover > /tmp/zkevm_prover_backup.sql"
-kurtosis service exec "$ENCLAVE_NAME" postgres-001 "pg_dump -U postgres -d zkevm_aggregator > /tmp/zkevm_aggregator_backup.sql"
+# Check if postgres service exists and get correct name
+POSTGRES_SERVICE=""
+if kurtosis service ls "$ENCLAVE_NAME" | grep -q "postgres-001"; then
+    POSTGRES_SERVICE="postgres-001"
+elif kurtosis service ls "$ENCLAVE_NAME" | grep -q "bs-postgres-001"; then
+    POSTGRES_SERVICE="bs-postgres-001"
+else
+    echo "WARNING: No postgres service found. Skipping database backup."
+    POSTGRES_SERVICE=""
+fi
 
-# Copy backups to host
-kurtosis service files download "$ENCLAVE_NAME" postgres-001 /tmp/zkevm_node_backup.sql "$BACKUP_DIR/"
-kurtosis service files download "$ENCLAVE_NAME" postgres-001 /tmp/zkevm_prover_backup.sql "$BACKUP_DIR/"
-kurtosis service files download "$ENCLAVE_NAME" postgres-001 /tmp/zkevm_aggregator_backup.sql "$BACKUP_DIR/"
+# Backup database data if postgres service exists
+if [ -n "$POSTGRES_SERVICE" ]; then
+    echo "Backing up databases from $POSTGRES_SERVICE..."
+    
+    # Check what databases exist
+    echo "Checking available databases..."
+    kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "psql -U postgres -l" || {
+        echo "WARNING: Cannot connect to postgres. Trying alternative user..."
+        kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "psql -U zkevm -l" || {
+            echo "ERROR: Cannot connect to postgres database"
+            echo "Available services:"
+            kurtosis service ls "$ENCLAVE_NAME"
+            exit 1
+        }
+    }
+    
+    # Try to backup databases with different users
+    for DB_USER in "postgres" "zkevm"; do
+        echo "Trying to backup with user: $DB_USER"
+        if kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "pg_dump -U $DB_USER -d zkevm_node > /tmp/zkevm_node_backup.sql" 2>/dev/null; then
+            echo "Successfully backed up zkevm_node with user $DB_USER"
+            kurtosis service files download "$ENCLAVE_NAME" "$POSTGRES_SERVICE" /tmp/zkevm_node_backup.sql "$BACKUP_DIR/"
+            break
+        fi
+    done
+    
+    for DB_USER in "postgres" "zkevm"; do
+        if kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "pg_dump -U $DB_USER -d zkevm_prover > /tmp/zkevm_prover_backup.sql" 2>/dev/null; then
+            echo "Successfully backed up zkevm_prover with user $DB_USER"
+            kurtosis service files download "$ENCLAVE_NAME" "$POSTGRES_SERVICE" /tmp/zkevm_prover_backup.sql "$BACKUP_DIR/"
+            break
+        fi
+    done
+    
+    for DB_USER in "postgres" "zkevm"; do
+        if kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "pg_dump -U $DB_USER -d zkevm_aggregator > /tmp/zkevm_aggregator_backup.sql" 2>/dev/null; then
+            echo "Successfully backed up zkevm_aggregator with user $DB_USER"
+            kurtosis service files download "$ENCLAVE_NAME" "$POSTGRES_SERVICE" /tmp/zkevm_aggregator_backup.sql "$BACKUP_DIR/"
+            break
+        fi
+    done
+else
+    echo "No postgres service found, skipping database backup"
+fi
 
 echo "Backup completed: $BACKUP_DIR"
 
@@ -245,13 +299,26 @@ else
     exit 1
 fi
 
-# Start other services
+# Start other services if they exist
 echo ""
 echo "=== Starting other services ==="
-kurtosis service start "$ENCLAVE_NAME" $SVC_CDKNODE
-kurtosis service start "$ENCLAVE_NAME" $SVC_PROVER
-kurtosis service start "$ENCLAVE_NAME" $SVC_BRIDGE
-kurtosis service start "$ENCLAVE_NAME" $SVC_SLESS_EXECUTOR
+
+# Check and start services if they exist
+if kurtosis service ls "$ENCLAVE_NAME" | grep -q "$SVC_CDKNODE"; then
+    kurtosis service start "$ENCLAVE_NAME" $SVC_CDKNODE
+fi
+
+if kurtosis service ls "$ENCLAVE_NAME" | grep -q "$SVC_PROVER"; then
+    kurtosis service start "$ENCLAVE_NAME" $SVC_PROVER
+fi
+
+if kurtosis service ls "$ENCLAVE_NAME" | grep -q "$SVC_BRIDGE"; then
+    kurtosis service start "$ENCLAVE_NAME" $SVC_BRIDGE
+fi
+
+if kurtosis service ls "$ENCLAVE_NAME" | grep -q "$SVC_SLESS_EXECUTOR"; then
+    kurtosis service start "$ENCLAVE_NAME" $SVC_SLESS_EXECUTOR
+fi
 
 echo ""
 echo "=== UPGRADE COMPLETED SUCCESSFULLY ==="
