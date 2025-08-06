@@ -110,29 +110,29 @@ if [ -n "$POSTGRES_SERVICE" ]; then
         exit 1
     }
     
-    # Backup databases with master_user
-    echo "Backing up zkevm_node database..."
-    if kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password pg_dump -U master_user -d zkevm_node > /tmp/zkevm_node_backup.sql" 2>/dev/null; then
-        echo "Successfully backed up zkevm_node"
-        kurtosis service files download "$ENCLAVE_NAME" "$POSTGRES_SERVICE" /tmp/zkevm_node_backup.sql "$BACKUP_DIR/"
+    # Backup databases with correct users
+    echo "Backing up prover_db database..."
+    if kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password pg_dump -U prover_user -d prover_db > /tmp/prover_db_backup.sql" 2>/dev/null; then
+        echo "Successfully backed up prover_db"
+        kurtosis service files download "$ENCLAVE_NAME" "$POSTGRES_SERVICE" /tmp/prover_db_backup.sql "$BACKUP_DIR/"
     else
-        echo "WARNING: Could not backup zkevm_node database"
+        echo "WARNING: Could not backup prover_db database"
     fi
     
-    echo "Backing up zkevm_prover database..."
-    if kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password pg_dump -U master_user -d zkevm_prover > /tmp/zkevm_prover_backup.sql" 2>/dev/null; then
-        echo "Successfully backed up zkevm_prover"
-        kurtosis service files download "$ENCLAVE_NAME" "$POSTGRES_SERVICE" /tmp/zkevm_prover_backup.sql "$BACKUP_DIR/"
+    echo "Backing up aggregator_db database..."
+    if kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password pg_dump -U aggregator_user -d aggregator_db > /tmp/aggregator_db_backup.sql" 2>/dev/null; then
+        echo "Successfully backed up aggregator_db"
+        kurtosis service files download "$ENCLAVE_NAME" "$POSTGRES_SERVICE" /tmp/aggregator_db_backup.sql "$BACKUP_DIR/"
     else
-        echo "WARNING: Could not backup zkevm_prover database"
+        echo "WARNING: Could not backup aggregator_db database"
     fi
     
-    echo "Backing up zkevm_aggregator database..."
-    if kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password pg_dump -U master_user -d zkevm_aggregator > /tmp/zkevm_aggregator_backup.sql" 2>/dev/null; then
-        echo "Successfully backed up zkevm_aggregator"
-        kurtosis service files download "$ENCLAVE_NAME" "$POSTGRES_SERVICE" /tmp/zkevm_aggregator_backup.sql "$BACKUP_DIR/"
+    echo "Backing up bridge_db database..."
+    if kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password pg_dump -U bridge_user -d bridge_db > /tmp/bridge_db_backup.sql" 2>/dev/null; then
+        echo "Successfully backed up bridge_db"
+        kurtosis service files download "$ENCLAVE_NAME" "$POSTGRES_SERVICE" /tmp/bridge_db_backup.sql "$BACKUP_DIR/"
     else
-        echo "WARNING: Could not backup zkevm_aggregator database"
+        echo "WARNING: Could not backup bridge_db database"
     fi
 else
     echo "No postgres service found, skipping database backup"
