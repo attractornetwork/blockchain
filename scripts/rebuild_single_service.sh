@@ -131,6 +131,16 @@ mkdir -p "$TEMP_DIR"
 # Copy the main kurtosis.yml file
 cp kurtosis.yml "$TEMP_DIR/"
 
+# Copy the main params.yml file и добавить service_to_rebuild
+cp params.yml "$TEMP_DIR/params.yml"
+# Добавляем переменную service_to_rebuild в секцию args с помощью yq
+if command -v yq >/dev/null 2>&1; then
+  yq e ".args.service_to_rebuild = \"$SERVICE_NAME\"" -i "$TEMP_DIR/params.yml"
+else
+  echo "yq не найден! Пожалуйста, установите yq для корректной работы этого скрипта."
+  exit 1
+fi
+
 # Create temporary main.star file
 cat > "$TEMP_DIR/main.star" << 'EOF'
 def run(plan, args):
@@ -150,18 +160,6 @@ def run(plan, args):
         return
 EOF
 
-# Create temporary params file with only the service to rebuild
-cat > "$TEMP_DIR/rebuild_params.yml" << EOF
-args:
-  service_to_rebuild: "$SERVICE_NAME"
-  deployment_suffix: "-001"
-  verbosity: "info"
-  global_log_level: "info"
-  sequencer_type: "erigon"
-  consensus_contract_type: "cdk-validium"
-  additional_services: []
-EOF
-
 # Copy necessary files to temp directory
 echo "Copying necessary files..."
 cp -r src "$TEMP_DIR/"
@@ -172,7 +170,7 @@ cp -r lib "$TEMP_DIR/"
 # Change to temp directory and run kurtosis
 echo "Running kurtosis to rebuild $SERVICE_NAME..."
 cd "$TEMP_DIR"
-kurtosis run --enclave "$ENCLAVE_NAME" --args-file rebuild_params.yml --image-download always .
+kurtosis run --enclave "$ENCLAVE_NAME" --args-file params.yml --image-download always .
 
 # Clean up
 cd - > /dev/null
