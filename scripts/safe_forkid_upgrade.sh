@@ -88,9 +88,9 @@ mkdir -p "$BACKUP_DIR"
 
 # Check if postgres service exists and get correct name
 POSTGRES_SERVICE="postgres-001"
-# if kurtosis service ls "$ENCLAVE_NAME" | grep -q "postgres-001"; then
+# if kurtosis enclave inspect "$ENCLAVE_NAME" | grep -q "postgres-001"; then
 #     POSTGRES_SERVICE="postgres-001"
-# elif kurtosis service ls "$ENCLAVE_NAME" | grep -q "bs-postgres-001"; then
+# elif kurtosis enclave inspect "$ENCLAVE_NAME" | grep -q "bs-postgres-001"; then
 #     POSTGRES_SERVICE="bs-postgres-001"
 # else
 #     echo "WARNING: No postgres service found. Skipping database backup."
@@ -106,7 +106,7 @@ if [ -n "$POSTGRES_SERVICE" ]; then
     kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U master_user -d master -c \"\\l\"" || {
         echo "ERROR: Cannot connect to postgres database"
         echo "Available services:"
-        kurtosis service ls "$ENCLAVE_NAME"
+        kurtosis enclave inspect "$ENCLAVE_NAME"
         exit 1
     }
     
@@ -300,19 +300,19 @@ echo ""
 echo "=== Starting other services ==="
 
 # Check and start services if they exist
-if kurtosis service ls "$ENCLAVE_NAME" | grep -q "$SVC_CDKNODE"; then
+if kurtosis enclave inspect "$ENCLAVE_NAME" | grep -q "$SVC_CDKNODE"; then
     kurtosis service start "$ENCLAVE_NAME" $SVC_CDKNODE
 fi
 
-if kurtosis service ls "$ENCLAVE_NAME" | grep -q "$SVC_PROVER"; then
+if kurtosis enclave inspect "$ENCLAVE_NAME" | grep -q "$SVC_PROVER"; then
     kurtosis service start "$ENCLAVE_NAME" $SVC_PROVER
 fi
 
-if kurtosis service ls "$ENCLAVE_NAME" | grep -q "$SVC_BRIDGE"; then
+if kurtosis enclave inspect "$ENCLAVE_NAME" | grep -q "$SVC_BRIDGE"; then
     kurtosis service start "$ENCLAVE_NAME" $SVC_BRIDGE
 fi
 
-if kurtosis service ls "$ENCLAVE_NAME" | grep -q "$SVC_SLESS_EXECUTOR"; then
+if kurtosis enclave inspect "$ENCLAVE_NAME" | grep -q "$SVC_SLESS_EXECUTOR"; then
     kurtosis service start "$ENCLAVE_NAME" $SVC_SLESS_EXECUTOR
 fi
 
@@ -324,6 +324,6 @@ echo "All L2 blockchain data preserved"
 echo "Backup location: $BACKUP_DIR"
 echo ""
 echo "Services status:"
-kurtosis service ls "$ENCLAVE_NAME"
+kurtosis enclave inspect "$ENCLAVE_NAME"
 
 exit 0 

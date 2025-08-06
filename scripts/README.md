@@ -68,3 +68,67 @@ Backups are automatically created in `/tmp/forkid_upgrade_backup_YYYYMMDD_HHMMSS
 - Step-by-step progress reporting
 - Error handling with clear messages
 - Confirmation prompts for unexpected states
+
+## safe_service_upgrade.sh
+**SAFE** service upgrade script that updates services with new configurations without changing forkid. This script is perfect for applying configuration changes, updating service images, or restarting services with new settings.
+
+### Key Features
+- ✅ **Preserves all L2 blockchain data**
+- ✅ **Creates automatic backups** before upgrade
+- ✅ **Updates specific service or all services**
+- ✅ **No forkid changes** - only service restarts
+- ✅ **Safe rollback capability** via backups
+- ✅ **Dependency-aware** upgrade order
+
+### Usage
+From the root of repo, run:
+```bash
+# Upgrade all services
+./scripts/safe_service_upgrade.sh <enclave_name>
+
+# Upgrade specific service (e.g., blockscout)
+./scripts/safe_service_upgrade.sh <enclave_name> <service_name>
+```
+
+**Examples:**
+```bash
+# Upgrade all services in enclave 'cdk'
+./scripts/safe_service_upgrade.sh cdk
+
+# Upgrade only blockscout service
+./scripts/safe_service_upgrade.sh cdk blockscout-001
+
+# Upgrade only grafana service
+./scripts/safe_service_upgrade.sh cdk grafana-001
+```
+
+### What the script does:
+1. **Validates** enclave exists
+2. **Creates backups** of all databases
+3. **Stops services** safely (in dependency order)
+4. **Starts services** with new configurations
+5. **Verifies** all services are running
+6. **Reports** any failed services
+
+### Perfect for:
+- Updating blockscout configuration
+- Applying new grafana dashboards
+- Updating service images
+- Restarting services with new settings
+- Applying configuration changes from git
+
+### Service upgrade order:
+1. postgres-001 (database)
+2. prometheus-001 (monitoring)
+3. grafana-001 (dashboards)
+4. panoptichain-001 (monitoring)
+5. blockscout-001 (explorer)
+6. zkevm-prover-001 (prover)
+7. zkevm-bridge-service-001 (bridge)
+8. zkevm-stateless-executor-001 (executor)
+9. cdk-node-001 (node)
+10. cdk-erigon-rpc-001 (RPC)
+11. cdk-erigon-sequencer-001 (sequencer)
+
+### Backup location:
+Backups are automatically created in `/tmp/service_upgrade_backup_YYYYMMDD_HHMMSS/`
