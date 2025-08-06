@@ -146,7 +146,7 @@ def run(plan, args):
     elif service_name == "panoptichain-001":
         import_module("./src/additional_services/panoptichain.star").run(plan, args)
     else:
-        print("Unknown service:", service_name)
+        plan.print("Unknown service")
         return
 EOF
 
