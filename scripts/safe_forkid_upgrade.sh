@@ -154,7 +154,7 @@ sleep 10
 echo ""
 echo "=== Updating contracts ==="
 echo "Updating to contract tag: $TAG_TARGET_FORKID"
-kurtosis service exec "$ENCLAVE_NAME" $SVC_CONTRACTS "cd /opt/zkevm-contracts && rm -f foundry.toml && git checkout $TAG_TARGET_FORKID"
+kurtosis service exec "$ENCLAVE_NAME" $SVC_CONTRACTS "cd /opt/zkevm-contracts && rm -f foundry.toml && git fetch && git checkout $TAG_TARGET_FORKID"
 
 # Create environment script for contract operations
 echo "Creating environment script..."
