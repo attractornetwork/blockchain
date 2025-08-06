@@ -68,7 +68,7 @@ fi
 
 # Check current forkid
 echo "=== Checking current forkid ==="
-CURRENT_FORKID=$(cast rpc --json --rpc-url $(kurtosis port print "$ENCLAVE_NAME" $SVC_RPC rpc) zkevm_getForkId | jq -r)
+CURRENT_FORKID=$(cast rpc --json --rpc-url $(kurtosis port print "$ENCLAVE_NAME" $SVC_RPC rpc) zkevm_getForkId | jq -r "tonumber")
 echo "Current forkid: $CURRENT_FORKID"
 if [ "$CURRENT_FORKID" -ne "$SOURCE_FORKID" ]; then
     echo "WARNING: Current forkid ($CURRENT_FORKID) doesn't match expected source forkid ($SOURCE_FORKID)"
@@ -87,15 +87,15 @@ echo "Creating backup in: $BACKUP_DIR"
 mkdir -p "$BACKUP_DIR"
 
 # Check if postgres service exists and get correct name
-POSTGRES_SERVICE=""
-if kurtosis service ls "$ENCLAVE_NAME" | grep -q "postgres-001"; then
-    POSTGRES_SERVICE="postgres-001"
-elif kurtosis service ls "$ENCLAVE_NAME" | grep -q "bs-postgres-001"; then
-    POSTGRES_SERVICE="bs-postgres-001"
-else
-    echo "WARNING: No postgres service found. Skipping database backup."
-    POSTGRES_SERVICE=""
-fi
+POSTGRES_SERVICE="postgres-001"
+# if kurtosis service ls "$ENCLAVE_NAME" | grep -q "postgres-001"; then
+#     POSTGRES_SERVICE="postgres-001"
+# elif kurtosis service ls "$ENCLAVE_NAME" | grep -q "bs-postgres-001"; then
+#     POSTGRES_SERVICE="bs-postgres-001"
+# else
+#     echo "WARNING: No postgres service found. Skipping database backup."
+#     POSTGRES_SERVICE=""
+# fi
 
 # Backup database data if postgres service exists
 if [ -n "$POSTGRES_SERVICE" ]; then
@@ -103,41 +103,37 @@ if [ -n "$POSTGRES_SERVICE" ]; then
     
     # Check what databases exist
     echo "Checking available databases..."
-    kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "psql -U postgres -l" || {
-        echo "WARNING: Cannot connect to postgres. Trying alternative user..."
-        kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "psql -U zkevm -l" || {
-            echo "ERROR: Cannot connect to postgres database"
-            echo "Available services:"
-            kurtosis service ls "$ENCLAVE_NAME"
-            exit 1
-        }
+    kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U master_user -d master -c \"\\l\"" || {
+        echo "ERROR: Cannot connect to postgres database"
+        echo "Available services:"
+        kurtosis service ls "$ENCLAVE_NAME"
+        exit 1
     }
     
-    # Try to backup databases with different users
-    for DB_USER in "postgres" "zkevm"; do
-        echo "Trying to backup with user: $DB_USER"
-        if kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "pg_dump -U $DB_USER -d zkevm_node > /tmp/zkevm_node_backup.sql" 2>/dev/null; then
-            echo "Successfully backed up zkevm_node with user $DB_USER"
-            kurtosis service files download "$ENCLAVE_NAME" "$POSTGRES_SERVICE" /tmp/zkevm_node_backup.sql "$BACKUP_DIR/"
-            break
-        fi
-    done
+    # Backup databases with master_user
+    echo "Backing up zkevm_node database..."
+    if kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password pg_dump -U master_user -d zkevm_node > /tmp/zkevm_node_backup.sql" 2>/dev/null; then
+        echo "Successfully backed up zkevm_node"
+        kurtosis service files download "$ENCLAVE_NAME" "$POSTGRES_SERVICE" /tmp/zkevm_node_backup.sql "$BACKUP_DIR/"
+    else
+        echo "WARNING: Could not backup zkevm_node database"
+    fi
     
-    for DB_USER in "postgres" "zkevm"; do
-        if kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "pg_dump -U $DB_USER -d zkevm_prover > /tmp/zkevm_prover_backup.sql" 2>/dev/null; then
-            echo "Successfully backed up zkevm_prover with user $DB_USER"
-            kurtosis service files download "$ENCLAVE_NAME" "$POSTGRES_SERVICE" /tmp/zkevm_prover_backup.sql "$BACKUP_DIR/"
-            break
-        fi
-    done
+    echo "Backing up zkevm_prover database..."
+    if kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password pg_dump -U master_user -d zkevm_prover > /tmp/zkevm_prover_backup.sql" 2>/dev/null; then
+        echo "Successfully backed up zkevm_prover"
+        kurtosis service files download "$ENCLAVE_NAME" "$POSTGRES_SERVICE" /tmp/zkevm_prover_backup.sql "$BACKUP_DIR/"
+    else
+        echo "WARNING: Could not backup zkevm_prover database"
+    fi
     
-    for DB_USER in "postgres" "zkevm"; do
-        if kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "pg_dump -U $DB_USER -d zkevm_aggregator > /tmp/zkevm_aggregator_backup.sql" 2>/dev/null; then
-            echo "Successfully backed up zkevm_aggregator with user $DB_USER"
-            kurtosis service files download "$ENCLAVE_NAME" "$POSTGRES_SERVICE" /tmp/zkevm_aggregator_backup.sql "$BACKUP_DIR/"
-            break
-        fi
-    done
+    echo "Backing up zkevm_aggregator database..."
+    if kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password pg_dump -U master_user -d zkevm_aggregator > /tmp/zkevm_aggregator_backup.sql" 2>/dev/null; then
+        echo "Successfully backed up zkevm_aggregator"
+        kurtosis service files download "$ENCLAVE_NAME" "$POSTGRES_SERVICE" /tmp/zkevm_aggregator_backup.sql "$BACKUP_DIR/"
+    else
+        echo "WARNING: Could not backup zkevm_aggregator database"
+    fi
 else
     echo "No postgres service found, skipping database backup"
 fi
@@ -250,7 +246,7 @@ COUNTER=0
 MAX_RETRIES=30
 while [ "$FORKID" -ne "$TARGET_FORKID" ] && [ $COUNTER -lt $MAX_RETRIES ]; do
     ((COUNTER++))
-    FORKID=$(printf "%d" $(cast rpc --json --rpc-url $(kurtosis port print "$ENCLAVE_NAME" "$SVC_SEQUENCER" rpc) zkevm_getForkId | jq -r))
+    FORKID=$(printf "%d" $(cast rpc --json --rpc-url $(kurtosis port print "$ENCLAVE_NAME" "$SVC_SEQUENCER" rpc) zkevm_getForkId | jq -r "tonumber"))
     echo "Current sequencer forkid: $FORKID (attempt $COUNTER/$MAX_RETRIES)"
     if [ "$FORKID" -ne "$TARGET_FORKID" ]; then
         sleep 5
@@ -285,7 +281,7 @@ COUNTER=0
 MAX_RETRIES=30
 while [ "$FORKID" -ne "$TARGET_FORKID" ] && [ $COUNTER -lt $MAX_RETRIES ]; do
     ((COUNTER++))
-    FORKID=$(printf "%d" $(cast rpc --json --rpc-url $(kurtosis port print "$ENCLAVE_NAME" "$SVC_RPC" rpc) zkevm_getForkId | jq -r))
+    FORKID=$(printf "%d" $(cast rpc --json --rpc-url $(kurtosis port print "$ENCLAVE_NAME" "$SVC_RPC" rpc) zkevm_getForkId | jq -r "tonumber"))
     echo "Current RPC forkid: $FORKID (attempt $COUNTER/$MAX_RETRIES)"
     if [ "$FORKID" -ne "$TARGET_FORKID" ]; then
         sleep 5
