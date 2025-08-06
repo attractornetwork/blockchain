@@ -95,8 +95,11 @@ From the root of repo, run:
 # Upgrade all services in enclave 'cdk'
 ./scripts/safe_service_upgrade.sh cdk
 
-# Upgrade only blockscout service
-./scripts/safe_service_upgrade.sh cdk blockscout-001
+# Upgrade only blockscout backend service
+./scripts/safe_service_upgrade.sh cdk bs-backend-001
+
+# Upgrade only blockscout frontend service
+./scripts/safe_service_upgrade.sh cdk bs-frontend-001
 
 # Upgrade only grafana service
 ./scripts/safe_service_upgrade.sh cdk grafana-001
@@ -118,17 +121,25 @@ From the root of repo, run:
 - Applying configuration changes from git
 
 ### Service upgrade order:
-1. postgres-001 (database)
-2. prometheus-001 (monitoring)
-3. grafana-001 (dashboards)
-4. panoptichain-001 (monitoring)
-5. blockscout-001 (explorer)
-6. zkevm-prover-001 (prover)
-7. zkevm-bridge-service-001 (bridge)
-8. zkevm-stateless-executor-001 (executor)
-9. cdk-node-001 (node)
-10. cdk-erigon-rpc-001 (RPC)
-11. cdk-erigon-sequencer-001 (sequencer)
+1. postgres-001 (main database)
+2. bs-postgres-001 (blockscout database)
+3. prometheus-001 (monitoring)
+4. grafana-001 (dashboards)
+5. panoptichain-001 (monitoring)
+6. visualize-001 (visualization)
+7. bs-backend-001 (blockscout backend)
+8. bs-frontend-001 (blockscout frontend)
+9. bs-stats-001 (blockscout stats)
+10. zkevm-prover-001 (prover)
+11. zkevm-bridge-service-001 (bridge)
+12. zkevm-bridge-ui-001 (bridge UI)
+13. zkevm-dac-001 (DAC)
+14. zkevm-pool-manager-001 (pool manager)
+15. zkevm-stateless-executor-001 (executor)
+16. agglayer (aggregation layer)
+17. agglayer-prover (aggregation prover)
+18. cdk-erigon-rpc-001 (RPC)
+19. cdk-erigon-sequencer-001 (sequencer)
 
 ### Backup location:
 Backups are automatically created in `/tmp/service_upgrade_backup_YYYYMMDD_HHMMSS/`

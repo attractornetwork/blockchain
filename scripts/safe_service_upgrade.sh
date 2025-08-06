@@ -16,19 +16,27 @@ fi
 ENCLAVE_NAME=$1
 SERVICE_NAME=$2
 
-# Service names
+# Service names (based on actual service names from enclave)
 SVC_SEQUENCER=cdk-erigon-sequencer-001
 SVC_RPC=cdk-erigon-rpc-001
 SVC_CONTRACTS=contracts-001
-SVC_CDKNODE=cdk-node-001
 SVC_PROVER=zkevm-prover-001
 SVC_BRIDGE=zkevm-bridge-service-001
 SVC_SLESS_EXECUTOR=zkevm-stateless-executor-001
 SVC_POSTGRES=postgres-001
-SVC_BLOCKSCOUT=blockscout-001
+SVC_BLOCKSCOUT_BACKEND=bs-backend-001
+SVC_BLOCKSCOUT_FRONTEND=bs-frontend-001
+SVC_BLOCKSCOUT_POSTGRES=bs-postgres-001
+SVC_BLOCKSCOUT_STATS=bs-stats-001
 SVC_GRAFANA=grafana-001
 SVC_PROMETHEUS=prometheus-001
 SVC_PANOPTICHAIN=panoptichain-001
+SVC_VISUALIZE=visualize-001
+SVC_BRIDGE_UI=zkevm-bridge-ui-001
+SVC_DAC=zkevm-dac-001
+SVC_POOL_MANAGER=zkevm-pool-manager-001
+SVC_AGGLAYER=agglayer
+SVC_AGGLAYER_PROVER=agglayer-prover
 
 echo "=== SAFE SERVICE UPGRADE ==="
 echo "Enclave: $ENCLAVE_NAME"
@@ -149,14 +157,22 @@ upgrade_all_services() {
     # List of services to upgrade (in order of dependency)
     local services=(
         "$SVC_POSTGRES"
+        "$SVC_BLOCKSCOUT_POSTGRES"
         "$SVC_PROMETHEUS"
         "$SVC_GRAFANA"
         "$SVC_PANOPTICHAIN"
-        "$SVC_BLOCKSCOUT"
+        "$SVC_VISUALIZE"
+        "$SVC_BLOCKSCOUT_BACKEND"
+        "$SVC_BLOCKSCOUT_FRONTEND"
+        "$SVC_BLOCKSCOUT_STATS"
         "$SVC_PROVER"
         "$SVC_BRIDGE"
+        "$SVC_BRIDGE_UI"
+        "$SVC_DAC"
+        "$SVC_POOL_MANAGER"
         "$SVC_SLESS_EXECUTOR"
-        "$SVC_CDKNODE"
+        "$SVC_AGGLAYER"
+        "$SVC_AGGLAYER_PROVER"
         "$SVC_RPC"
         "$SVC_SEQUENCER"
     )
