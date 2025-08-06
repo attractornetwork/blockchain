@@ -155,9 +155,8 @@ upgrade_all_services() {
     echo "=== Upgrading all services ==="
     
     # List of services to upgrade (in order of dependency)
+    # Note: We skip postgres and other critical infrastructure services
     local services=(
-        "$SVC_POSTGRES"
-        "$SVC_BLOCKSCOUT_POSTGRES"
         "$SVC_PROMETHEUS"
         "$SVC_GRAFANA"
         "$SVC_PANOPTICHAIN"
@@ -182,10 +181,29 @@ upgrade_all_services() {
     done
 }
 
+# Function to upgrade only blockscout services
+upgrade_blockscout_services() {
+    echo ""
+    echo "=== Upgrading blockscout services ==="
+    
+    local blockscout_services=(
+        "$SVC_BLOCKSCOUT_BACKEND"
+        "$SVC_BLOCKSCOUT_FRONTEND"
+        "$SVC_BLOCKSCOUT_STATS"
+    )
+    
+    for service in "${blockscout_services[@]}"; do
+        upgrade_service "$service"
+    done
+}
+
 # Main upgrade logic
 if [ -n "$SERVICE_NAME" ]; then
     # Upgrade specific service
     upgrade_service "$SERVICE_NAME"
+elif [ "$SERVICE_NAME" = "blockscout" ]; then
+    # Upgrade only blockscout services
+    upgrade_blockscout_services
 else
     # Upgrade all services
     upgrade_all_services

@@ -95,6 +95,9 @@ From the root of repo, run:
 # Upgrade all services in enclave 'cdk'
 ./scripts/safe_service_upgrade.sh cdk
 
+# Upgrade only blockscout services (backend, frontend, stats)
+./scripts/safe_service_upgrade.sh cdk blockscout
+
 # Upgrade only blockscout backend service
 ./scripts/safe_service_upgrade.sh cdk bs-backend-001
 
@@ -121,25 +124,31 @@ From the root of repo, run:
 - Applying configuration changes from git
 
 ### Service upgrade order:
-1. postgres-001 (main database)
-2. bs-postgres-001 (blockscout database)
-3. prometheus-001 (monitoring)
-4. grafana-001 (dashboards)
-5. panoptichain-001 (monitoring)
-6. visualize-001 (visualization)
-7. bs-backend-001 (blockscout backend)
-8. bs-frontend-001 (blockscout frontend)
-9. bs-stats-001 (blockscout stats)
-10. zkevm-prover-001 (prover)
-11. zkevm-bridge-service-001 (bridge)
-12. zkevm-bridge-ui-001 (bridge UI)
-13. zkevm-dac-001 (DAC)
-14. zkevm-pool-manager-001 (pool manager)
-15. zkevm-stateless-executor-001 (executor)
-16. agglayer (aggregation layer)
-17. agglayer-prover (aggregation prover)
-18. cdk-erigon-rpc-001 (RPC)
-19. cdk-erigon-sequencer-001 (sequencer)
+**All services (excluding critical infrastructure):**
+1. prometheus-001 (monitoring)
+2. grafana-001 (dashboards)
+3. panoptichain-001 (monitoring)
+4. visualize-001 (visualization)
+5. bs-backend-001 (blockscout backend)
+6. bs-frontend-001 (blockscout frontend)
+7. bs-stats-001 (blockscout stats)
+8. zkevm-prover-001 (prover)
+9. zkevm-bridge-service-001 (bridge)
+10. zkevm-bridge-ui-001 (bridge UI)
+11. zkevm-dac-001 (DAC)
+12. zkevm-pool-manager-001 (pool manager)
+13. zkevm-stateless-executor-001 (executor)
+14. agglayer (aggregation layer)
+15. agglayer-prover (aggregation prover)
+16. cdk-erigon-rpc-001 (RPC)
+17. cdk-erigon-sequencer-001 (sequencer)
+
+**Blockscout services only:**
+1. bs-backend-001 (blockscout backend)
+2. bs-frontend-001 (blockscout frontend)
+3. bs-stats-001 (blockscout stats)
+
+**Note:** Database services (postgres-001, bs-postgres-001) are excluded to prevent infrastructure issues.
 
 ### Backup location:
 Backups are automatically created in `/tmp/service_upgrade_backup_YYYYMMDD_HHMMSS/`
