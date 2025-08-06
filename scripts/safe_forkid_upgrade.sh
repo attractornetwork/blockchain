@@ -164,7 +164,7 @@ kurtosis service exec "$ENCLAVE_NAME" $SVC_CONTRACTS "echo 'ROLLUP_MAN=\$(cat zk
 kurtosis service exec "$ENCLAVE_NAME" $SVC_CONTRACTS "echo 'ROLLUP=\$(cat zkevm/combined.json | jq -r .rollupAddress)' >> /opt/upgrade_commands.sh"
 kurtosis service exec "$ENCLAVE_NAME" $SVC_CONTRACTS "echo 'GENESIS=\$(cat zkevm/combined.json  | jq -r .genesis)' >> /opt/upgrade_commands.sh"
 kurtosis service exec "$ENCLAVE_NAME" $SVC_CONTRACTS "echo \"CONSENSUS=\\\$(cast call \\\$ROLLUP_MAN 'rollupTypeMap(uint32)(address,address,uint64,uint8,bool,bytes32)' 1 | head -1)\" >> /opt/upgrade_commands.sh"
-kurtosis service exec "$ENCLAVE_NAME" $SVC_CONTRACTS "echo PRIV_KEY=0x1c814c297915f2a0bceaaaeba80a9f8a2510fa0b849f5dbf145288bd127c8d47 >> /opt/upgrade_commands.sh"
+kurtosis service exec "$ENCLAVE_NAME" $SVC_CONTRACTS "echo PRIV_KEY=0x3b4f6cf61e9c8117bdbc13e3b3b4dce724b5b7493e209897d7b1b89be26e662d >> /opt/upgrade_commands.sh"
 kurtosis service exec "$ENCLAVE_NAME" $SVC_CONTRACTS "chmod +x /opt/upgrade_commands.sh"
 
 # Deploy new verifier
