@@ -128,6 +128,9 @@ echo "Creating temporary Starlark file for $SERVICE_NAME..."
 TEMP_DIR="/tmp/kurtosis_rebuild_$(date +%s)"
 mkdir -p "$TEMP_DIR"
 
+# Copy the main kurtosis.yml file
+cp kurtosis.yml "$TEMP_DIR/"
+
 # Create temporary main.star file
 cat > "$TEMP_DIR/main.star" << 'EOF'
 def run(plan, args):
