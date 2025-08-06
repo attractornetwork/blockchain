@@ -72,6 +72,17 @@ Backups are automatically created in `/tmp/forkid_upgrade_backup_YYYYMMDD_HHMMSS
 ## safe_service_upgrade.sh
 **SAFE** service upgrade script that updates services with new configurations without changing forkid. This script is perfect for applying configuration changes, updating service images, or restarting services with new settings.
 
+## rebuild_single_service.sh
+**SAFE** single service rebuild script that removes and re-adds a specific service with new configurations. This is more aggressive than `safe_service_upgrade.sh` but ensures the service is completely rebuilt with new configurations.
+
+### Key Differences:
+- **safe_service_upgrade.sh**: Uses `kurtosis service update` - tries to update in-place
+- **rebuild_single_service.sh**: Uses `kurtosis service rm` + `kurtosis service add` - completely rebuilds the service
+
+### When to use which:
+- **safe_service_upgrade.sh**: For minor configuration changes, service restarts
+- **rebuild_single_service.sh**: For major configuration changes, when `update` fails, or when you need a fresh service
+
 ### Key Features
 - ✅ **Preserves all L2 blockchain data**
 - ✅ **Creates automatic backups** before upgrade
