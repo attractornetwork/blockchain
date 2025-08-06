@@ -98,6 +98,9 @@ From the root of repo, run:
 # Upgrade only blockscout services (backend, frontend, stats)
 ./scripts/safe_service_upgrade.sh cdk blockscout
 
+# Upgrade only grafana service
+./scripts/safe_service_upgrade.sh cdk grafana
+
 # Upgrade only blockscout backend service
 ./scripts/safe_service_upgrade.sh cdk bs-backend-001
 
@@ -112,9 +115,10 @@ From the root of repo, run:
 1. **Validates** enclave exists
 2. **Creates backups** of all databases
 3. **Stops services** safely (in dependency order)
-4. **Starts services** with new configurations
-5. **Verifies** all services are running
-6. **Reports** any failed services
+4. **Updates services** with new configurations using `kurtosis service update`
+5. **Starts services** with updated configurations
+6. **Verifies** all services are running
+7. **Reports** any failed services
 
 ### Perfect for:
 - Updating blockscout configuration

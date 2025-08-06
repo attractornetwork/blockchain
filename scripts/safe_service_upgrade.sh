@@ -9,7 +9,7 @@ set -e
 if [ "$#" -lt 1 ]; then
     echo "Usage: safe_service_upgrade.sh <enclave_name> [service_name]"
     echo "Example: ./scripts/safe_service_upgrade.sh cdk"
-    echo "Example: ./scripts/safe_service_upgrade.sh cdk blockscout-001"
+    echo "Example: ./scripts/safe_service_upgrade.sh cdk bs-backend-001"
     exit 1
 fi
 
@@ -140,6 +140,9 @@ upgrade_service() {
     echo "Waiting for $service to stop..."
     sleep 5
     
+    echo "Updating $service with new configuration..."
+    kurtosis service update "$ENCLAVE_NAME" "$service"
+    
     echo "Starting $service..."
     kurtosis service start "$ENCLAVE_NAME" "$service"
     
@@ -147,6 +150,36 @@ upgrade_service() {
     sleep 10
     
     echo "SUCCESS: $service upgraded"
+}
+
+# Function to upgrade only blockscout services
+upgrade_blockscout_services() {
+    echo ""
+    echo "=== Upgrading blockscout services ==="
+    
+    local blockscout_services=(
+        "$SVC_BLOCKSCOUT_BACKEND"
+        "$SVC_BLOCKSCOUT_FRONTEND"
+        "$SVC_BLOCKSCOUT_STATS"
+    )
+    
+    for service in "${blockscout_services[@]}"; do
+        upgrade_service "$service"
+    done
+}
+
+# Function to upgrade only grafana services
+upgrade_grafana_services() {
+    echo ""
+    echo "=== Upgrading grafana services ==="
+    
+    local grafana_services=(
+        "$SVC_GRAFANA"
+    )
+    
+    for service in "${grafana_services[@]}"; do
+        upgrade_service "$service"
+    done
 }
 
 # Function to upgrade all services
@@ -181,29 +214,18 @@ upgrade_all_services() {
     done
 }
 
-# Function to upgrade only blockscout services
-upgrade_blockscout_services() {
-    echo ""
-    echo "=== Upgrading blockscout services ==="
-    
-    local blockscout_services=(
-        "$SVC_BLOCKSCOUT_BACKEND"
-        "$SVC_BLOCKSCOUT_FRONTEND"
-        "$SVC_BLOCKSCOUT_STATS"
-    )
-    
-    for service in "${blockscout_services[@]}"; do
-        upgrade_service "$service"
-    done
-}
-
 # Main upgrade logic
 if [ -n "$SERVICE_NAME" ]; then
-    # Upgrade specific service
-    upgrade_service "$SERVICE_NAME"
-elif [ "$SERVICE_NAME" = "blockscout" ]; then
-    # Upgrade only blockscout services
-    upgrade_blockscout_services
+    if [ "$SERVICE_NAME" = "blockscout" ]; then
+        # Upgrade only blockscout services
+        upgrade_blockscout_services
+    elif [ "$SERVICE_NAME" = "grafana" ]; then
+        # Upgrade only grafana services
+        upgrade_grafana_services
+    else
+        # Upgrade specific service
+        upgrade_service "$SERVICE_NAME"
+    fi
 else
     # Upgrade all services
     upgrade_all_services
