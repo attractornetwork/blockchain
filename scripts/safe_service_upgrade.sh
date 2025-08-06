@@ -57,19 +57,19 @@ fi
 
 # Function to get list of services in enclave
 get_services() {
-    kurtosis enclave inspect "$ENCLAVE_NAME" | grep -E "^[[:space:]]*[a-zA-Z0-9-]+-[0-9]+" | awk '{print $1}' | tr -d ' '
+    kurtosis enclave inspect "$ENCLAVE_NAME" | grep -E "^[[:space:]]*[a-zA-Z0-9-]+(-[0-9]+)?[[:space:]]" | awk '{print $2}' | grep -v "^$"
 }
 
 # Function to check if service exists
 service_exists() {
     local service=$1
-    get_services | grep -q "^${service}$"
+    kurtosis enclave inspect "$ENCLAVE_NAME" | grep -q "[[:space:]]${service}[[:space:]]"
 }
 
 # Function to check if service is running
 service_is_running() {
     local service=$1
-    kurtosis enclave inspect "$ENCLAVE_NAME" | grep -A 5 "^[[:space:]]*${service}[[:space:]]" | grep -q "RUNNING"
+    kurtosis enclave inspect "$ENCLAVE_NAME" | grep -A 2 "[[:space:]]${service}[[:space:]]" | grep -q "RUNNING"
 }
 
 # Create backup
