@@ -159,7 +159,7 @@ kurtosis service exec "$ENCLAVE_NAME" $SVC_CONTRACTS "cd /opt/zkevm-contracts &&
 # Create environment script for contract operations
 echo "Creating environment script..."
 kurtosis service exec "$ENCLAVE_NAME" $SVC_CONTRACTS "echo 'cd /opt' > /opt/upgrade_commands.sh"
-kurtosis service exec "$ENCLAVE_NAME" $SVC_CONTRACTS "echo 'export ETH_RPC_URL=http://el-1-geth-lighthouse:8545' >> /opt/upgrade_commands.sh"
+kurtosis service exec "$ENCLAVE_NAME" $SVC_CONTRACTS "echo 'export ETH_RPC_URL=https://eth-sepolia.g.alchemy.com/v2/6NAxd-WTD8rBYjDKCKgkcUwvGWOcSc-6' >> /opt/upgrade_commands.sh"
 kurtosis service exec "$ENCLAVE_NAME" $SVC_CONTRACTS "echo 'ROLLUP_MAN=\$(cat zkevm/combined.json  | jq -r .polygonRollupManagerAddress)' >> /opt/upgrade_commands.sh"
 kurtosis service exec "$ENCLAVE_NAME" $SVC_CONTRACTS "echo 'ROLLUP=\$(cat zkevm/combined.json | jq -r .rollupAddress)' >> /opt/upgrade_commands.sh"
 kurtosis service exec "$ENCLAVE_NAME" $SVC_CONTRACTS "echo 'GENESIS=\$(cat zkevm/combined.json  | jq -r .genesis)' >> /opt/upgrade_commands.sh"
