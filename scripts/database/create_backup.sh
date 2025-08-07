@@ -86,10 +86,27 @@ for db_name in "${!DATABASES[@]}"; do
     if kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password pg_dump -U $db_user -d $db_name > /tmp/$backup_file" 2>/dev/null; then
         echo "✅ Successfully backed up $db_name"
         
+        # Check if the backup file was created and has content
+        file_size=$(kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "ls -lh /tmp/$backup_file 2>/dev/null | awk '{print \$5}' || echo '0'")
+        if [ "$file_size" != "0" ] && [ "$file_size" != "" ]; then
+            echo "✅ Backup file size: $file_size"
+        else
+            echo "⚠️  Backup file appears to be empty or missing"
+        fi
+        
         # Download the backup file
+        echo "Downloading $backup_file from container..."
         if kurtosis service files download "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "/tmp/$backup_file" "$BACKUP_DIR/"; then
             echo "✅ Downloaded $backup_file to $BACKUP_DIR"
-            BACKUP_COUNT=$((BACKUP_COUNT + 1))
+            # Verify the file was actually downloaded
+            if [ -f "$BACKUP_DIR/$backup_file" ]; then
+                file_size=$(du -h "$BACKUP_DIR/$backup_file" | cut -f1)
+                echo "✅ File verified: $backup_file ($file_size)"
+                BACKUP_COUNT=$((BACKUP_COUNT + 1))
+            else
+                echo "❌ File download failed - file not found in $BACKUP_DIR"
+                BACKUP_SUCCESS=false
+            fi
         else
             echo "❌ Failed to download $backup_file"
             BACKUP_SUCCESS=false
@@ -146,7 +163,16 @@ Backup directory: $BACKUP_DIR
 Databases backed up: $BACKUP_COUNT
 
 Available databases:
-$(ls "$BACKUP_DIR"/*.sql 2>/dev/null | xargs -n1 basename | sed 's/^/  - /')
+EOF
+
+    # Add available databases to the metadata file
+    for file in "$BACKUP_DIR"/*.sql; do
+        if [ -f "$file" ]; then
+            echo "  - $(basename "$file")" >> "$BACKUP_DIR/backup_info.txt"
+        fi
+    done
+
+    cat >> "$BACKUP_DIR/backup_info.txt" << EOF
 
 Restore commands:
 - Full restore: ./scripts/restore_service_data.sh $ENCLAVE_NAME $BACKUP_DIR
