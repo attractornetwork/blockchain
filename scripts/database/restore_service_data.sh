@@ -173,6 +173,71 @@ restore_database() {
     fi
 }
 
+# Function to restore blockchain data
+restore_blockchain_data() {
+    local blockchain_backup="$BACKUP_DIR/blockchain_data_backup.tar.gz"
+    
+    if [ ! -f "$blockchain_backup" ]; then
+        echo "⚠️  Blockchain backup not found: $blockchain_backup"
+        echo "Skipping blockchain data restoration"
+        return 0
+    fi
+    
+    echo "Restoring blockchain data from $blockchain_backup..."
+    
+    # Check if Erigon sequencer exists
+    ERIGON_SEQUENCER="cdk-erigon-sequencer-001"
+    if ! service_exists "$ERIGON_SEQUENCER"; then
+        echo "⚠️  Erigon sequencer '$ERIGON_SEQUENCER' not found, skipping blockchain restoration"
+        return 0
+    fi
+    
+    echo "✅ Erigon sequencer found: $ERIGON_SEQUENCER"
+    
+    # Get container ID for docker cp (using pattern matching)
+    echo "Getting container ID for $ERIGON_SEQUENCER..."
+    CONTAINER_ID=$(sudo docker ps | grep "${ERIGON_SEQUENCER}--" | awk '{print $1}')
+    
+    if [ -z "$CONTAINER_ID" ]; then
+        echo "❌ Could not find container ID for $ERIGON_SEQUENCER"
+        echo "Available containers:"
+        sudo docker ps | grep erigon
+        return 1
+    fi
+    
+    echo "Found container ID: $CONTAINER_ID"
+    
+    # Copy blockchain backup to container
+    echo "Copying blockchain backup to container..."
+    if sudo docker cp "$blockchain_backup" "$CONTAINER_ID:/tmp/blockchain_data_backup.tar.gz"; then
+        echo "✅ Blockchain backup copied to container"
+        
+        # Verify file was copied
+        kurtosis service exec "$ENCLAVE_NAME" "$ERIGON_SEQUENCER" "ls -lh /tmp/blockchain_data_backup.tar.gz"
+        
+        # Extract blockchain data
+        echo "Extracting blockchain data..."
+        if kurtosis service exec "$ENCLAVE_NAME" "$ERIGON_SEQUENCER" "cd /home/erigon/data && tar -xzf /tmp/blockchain_data_backup.tar.gz"; then
+            echo "✅ Blockchain data extracted successfully"
+            
+            # Verify extraction
+            kurtosis service exec "$ENCLAVE_NAME" "$ERIGON_SEQUENCER" "du -sh /home/erigon/data/dynamic-Attractor-sequencer"
+            
+            # Clean up temporary file
+            kurtosis service exec "$ENCLAVE_NAME" "$ERIGON_SEQUENCER" "rm -f /tmp/blockchain_data_backup.tar.gz"
+            
+            echo "✅ Blockchain data restoration completed"
+            return 0
+        else
+            echo "❌ Failed to extract blockchain data"
+            return 1
+        fi
+    else
+        echo "❌ Failed to copy blockchain backup to container"
+        return 1
+    fi
+}
+
 # Restore each database
 RESTORATION_SUCCESS=true
 
@@ -204,6 +269,14 @@ if [ -f "$BACKUP_DIR/pool_manager_db_backup.sql" ]; then
     if ! restore_database "pool_manager_db_backup.sql" "pool_manager_db" "pool_manager_user"; then
         RESTORATION_SUCCESS=false
     fi
+fi
+
+# Restore blockchain data after databases
+echo ""
+echo "=== RESTORING BLOCKCHAIN DATA ==="
+if ! restore_blockchain_data; then
+    echo "⚠️  Blockchain data restoration failed, but continuing..."
+    # Don't fail the entire script if blockchain restoration fails
 fi
 
 echo ""
