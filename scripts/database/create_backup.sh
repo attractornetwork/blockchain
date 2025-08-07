@@ -94,21 +94,33 @@ for db_name in "${!DATABASES[@]}"; do
             echo "⚠️  Backup file appears to be empty or missing"
         fi
         
-        # Download the backup file
+        # Download the backup file using kubectl cp approach
         echo "Downloading $backup_file from container..."
-        if kurtosis service files download "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "/tmp/$backup_file" "$BACKUP_DIR/"; then
-            echo "✅ Downloaded $backup_file to $BACKUP_DIR"
-            # Verify the file was actually downloaded
-            if [ -f "$BACKUP_DIR/$backup_file" ]; then
-                file_size=$(du -h "$BACKUP_DIR/$backup_file" | cut -f1)
-                echo "✅ File verified: $backup_file ($file_size)"
-                BACKUP_COUNT=$((BACKUP_COUNT + 1))
+        
+        # Get the container ID for the postgres service
+        container_id=$(kurtosis service inspect "$ENCLAVE_NAME" "$POSTGRES_SERVICE" | grep -o 'Container ID: [a-f0-9]*' | cut -d' ' -f3)
+        
+        if [ -n "$container_id" ]; then
+            echo "Container ID: $container_id"
+            
+            # Use docker cp to copy the file
+            if docker cp "${container_id}:/tmp/$backup_file" "$BACKUP_DIR/$backup_file" 2>/dev/null; then
+                echo "✅ Downloaded $backup_file to $BACKUP_DIR"
+                # Verify the file was actually downloaded
+                if [ -f "$BACKUP_DIR/$backup_file" ]; then
+                    file_size=$(du -h "$BACKUP_DIR/$backup_file" | cut -f1)
+                    echo "✅ File verified: $backup_file ($file_size)"
+                    BACKUP_COUNT=$((BACKUP_COUNT + 1))
+                else
+                    echo "❌ File download failed - file not found in $BACKUP_DIR"
+                    BACKUP_SUCCESS=false
+                fi
             else
-                echo "❌ File download failed - file not found in $BACKUP_DIR"
+                echo "❌ Failed to download $backup_file using docker cp"
                 BACKUP_SUCCESS=false
             fi
         else
-            echo "❌ Failed to download $backup_file"
+            echo "❌ Could not get container ID for $POSTGRES_SERVICE"
             BACKUP_SUCCESS=false
         fi
         
