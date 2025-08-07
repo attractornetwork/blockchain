@@ -1,14 +1,14 @@
 #!/bin/bash
 
 # Service data restoration script
-# Usage: ./scripts/restore_service_data.sh <enclave_name> <backup_directory>
+# Usage: ./scripts/database/restore_service_data.sh <enclave_name> <backup_directory>
 
 set -e
 
 # Check we receive 2 params
 if [ "$#" -ne 2 ]; then
     echo "Usage: restore_service_data.sh <enclave_name> <backup_directory>"
-    echo "Example: ./scripts/restore_service_data.sh cdk /tmp/rebuild_backup_20241201_143022"
+    echo "Example: ./scripts/database/restore_service_data.sh cdk /mnt/c/Users/oneze/kurtosis-test/blockchain/scripts/database/backup"
     echo ""
     echo "This script restores database dumps to running services in the enclave."
     echo "It should be used after rebuilding services with rebuild_single_service.sh"
@@ -83,6 +83,14 @@ if [ -f "$BACKUP_DIR/bridge_db_backup.sql" ]; then
     BACKUP_FILES+=("bridge_db_backup.sql")
     echo "✅ bridge_db_backup.sql"
 fi
+if [ -f "$BACKUP_DIR/dac_db_backup.sql" ]; then
+    BACKUP_FILES+=("dac_db_backup.sql")
+    echo "✅ dac_db_backup.sql"
+fi
+if [ -f "$BACKUP_DIR/pool_manager_db_backup.sql" ]; then
+    BACKUP_FILES+=("pool_manager_db_backup.sql")
+    echo "✅ pool_manager_db_backup.sql"
+fi
 
 if [ ${#BACKUP_FILES[@]} -eq 0 ]; then
     echo "❌ No backup files found in $BACKUP_DIR"
@@ -118,27 +126,34 @@ restore_database() {
     
     echo "Restoring $db_name from $backup_file..."
     
-    # Upload backup file to postgres container
+    # Upload backup file to postgres container using base64
     echo "Uploading backup file to postgres container..."
-    kurtosis service files upload "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "$BACKUP_DIR/$backup_file" /tmp/
     
-    # Drop and recreate database
-    echo "Dropping and recreating $db_name..."
-    kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U postgres -c \"DROP DATABASE IF EXISTS $db_name;\""
-    kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U postgres -c \"CREATE DATABASE $db_name;\""
-    kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U postgres -c \"GRANT ALL PRIVILEGES ON DATABASE $db_name TO $db_user;\""
-    
-    # Restore data
-    echo "Restoring data to $db_name..."
-    if kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U $db_user -d $db_name < /tmp/$backup_file"; then
-        echo "✅ Successfully restored $db_name"
+    # Encode the backup file to base64 and upload
+    if base64 "$BACKUP_DIR/$backup_file" | kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "base64 -d > /tmp/$backup_file"; then
+        echo "✅ File uploaded successfully"
+        
+        # Drop and recreate database
+        echo "Dropping and recreating $db_name..."
+        kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U postgres -c \"DROP DATABASE IF EXISTS $db_name;\""
+        kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U postgres -c \"CREATE DATABASE $db_name;\""
+        kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U postgres -c \"GRANT ALL PRIVILEGES ON DATABASE $db_name TO $db_user;\""
+        
+        # Restore data
+        echo "Restoring data to $db_name..."
+        if kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U $db_user -d $db_name < /tmp/$backup_file"; then
+            echo "✅ Successfully restored $db_name"
+        else
+            echo "❌ Failed to restore $db_name"
+            return 1
+        fi
+        
+        # Clean up uploaded file
+        kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "rm -f /tmp/$backup_file"
     else
-        echo "❌ Failed to restore $db_name"
+        echo "❌ Failed to upload backup file"
         return 1
     fi
-    
-    # Clean up uploaded file
-    kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "rm -f /tmp/$backup_file"
 }
 
 # Restore each database
@@ -158,6 +173,18 @@ fi
 
 if [ -f "$BACKUP_DIR/bridge_db_backup.sql" ]; then
     if ! restore_database "bridge_db_backup.sql" "bridge_db" "bridge_user"; then
+        RESTORATION_SUCCESS=false
+    fi
+fi
+
+if [ -f "$BACKUP_DIR/dac_db_backup.sql" ]; then
+    if ! restore_database "dac_db_backup.sql" "dac_db" "dac_user"; then
+        RESTORATION_SUCCESS=false
+    fi
+fi
+
+if [ -f "$BACKUP_DIR/pool_manager_db_backup.sql" ]; then
+    if ! restore_database "pool_manager_db_backup.sql" "pool_manager_db" "pool_manager_user"; then
         RESTORATION_SUCCESS=false
     fi
 fi
@@ -212,6 +239,22 @@ for db_file in "${BACKUP_FILES[@]}"; do
                 echo "✅ bridge_db is accessible"
             else
                 echo "❌ bridge_db is not accessible"
+            fi
+            ;;
+        "dac_db_backup.sql")
+            echo "Testing dac_db connection..."
+            if kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U dac_user -d dac_db -c 'SELECT 1;'" >/dev/null 2>&1; then
+                echo "✅ dac_db is accessible"
+            else
+                echo "❌ dac_db is not accessible"
+            fi
+            ;;
+        "pool_manager_db_backup.sql")
+            echo "Testing pool_manager_db connection..."
+            if kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U pool_manager_user -d pool_manager_db -c 'SELECT 1;'" >/dev/null 2>&1; then
+                echo "✅ pool_manager_db is accessible"
+            else
+                echo "❌ pool_manager_db is not accessible"
             fi
             ;;
     esac
