@@ -130,6 +130,37 @@ for db_name in "${!DATABASES[@]}"; do
 done
 
 echo ""
+echo "=== BACKING UP BLOCKCHAIN DATA (ERIGON) ==="
+
+# Проверяем наличие Erigon sequencer
+ERIGON_SEQUENCER="cdk-erigon-sequencer-001"
+if service_exists "$ERIGON_SEQUENCER"; then
+    echo "Backing up blockchain data from $ERIGON_SEQUENCER..."
+    # Создаем архив данных блокчейна
+    if kurtosis service exec "$ENCLAVE_NAME" "$ERIGON_SEQUENCER" "tar -czf /tmp/blockchain_data_backup.tar.gz -C /home/erigon/data dynamic-Attractor-sequencer"; then
+        echo "✅ Blockchain data archive created"
+        # Проверяем размер архива
+        kurtosis service exec "$ENCLAVE_NAME" "$ERIGON_SEQUENCER" "ls -lh /tmp/blockchain_data_backup.tar.gz"
+        # Скачиваем архив через base64
+        if kurtosis service exec "$ENCLAVE_NAME" "$ERIGON_SEQUENCER" "base64 /tmp/blockchain_data_backup.tar.gz" > "$BACKUP_DIR/blockchain_data_backup.tar.gz.b64"; then
+            # Декодируем на хосте
+            if base64 -d "$BACKUP_DIR/blockchain_data_backup.tar.gz.b64" > "$BACKUP_DIR/blockchain_data_backup.tar.gz"; then
+                rm "$BACKUP_DIR/blockchain_data_backup.tar.gz.b64"
+                echo "✅ Blockchain data archive downloaded and decoded: $BACKUP_DIR/blockchain_data_backup.tar.gz"
+            else
+                echo "❌ Failed to decode blockchain data archive!"
+            fi
+        else
+            echo "❌ Failed to download blockchain data archive via base64!"
+        fi
+    else
+        echo "❌ Failed to create blockchain data archive in container!"
+    fi
+else
+    echo "No Erigon sequencer found, skipping blockchain data backup"
+fi
+
+echo ""
 echo "=== BACKUP SUMMARY ==="
 echo "Backup directory: $BACKUP_DIR"
 echo "Successfully backed up: $BACKUP_COUNT database(s)"
@@ -181,6 +212,10 @@ EOF
             echo "  - $(basename "$file")" >> "$BACKUP_DIR/backup_info.txt"
         fi
     done
+
+    if [ -f "$BACKUP_DIR/blockchain_data_backup.tar.gz" ]; then
+        echo "  - blockchain_data_backup.tar.gz" >> "$BACKUP_DIR/backup_info.txt"
+    fi
 
     cat >> "$BACKUP_DIR/backup_info.txt" << EOF
 
