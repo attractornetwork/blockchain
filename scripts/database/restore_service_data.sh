@@ -140,10 +140,16 @@ restore_database() {
         db_exists_result=$(kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U master_user -d master -c \"SELECT datname FROM pg_database WHERE datname = '$db_name';\" 2>/dev/null | grep -c '$db_name' || echo '0'")
         
         if [ "$db_exists_result" = "1" ]; then
-            echo "Database $db_name exists. Since services are running, skipping drop/recreate to avoid conflicts."
-            echo "⚠️  Will restore data directly to existing database."
-            # Just grant privileges if needed
-            kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U master_user -d master -c \"GRANT ALL PRIVILEGES ON DATABASE $db_name TO $db_user;\" 2>/dev/null || true"
+            echo "Database $db_name exists. Force dropping and recreating for complete data replacement..."
+            
+            # Force drop database (terminate connections first)
+            echo "Terminating all connections to $db_name..."
+            kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U master_user -d master -c \"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '$db_name' AND pid <> pg_backend_pid();\" 2>/dev/null || true"
+            
+            echo "Dropping and recreating $db_name..."
+            kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U master_user -d master -c \"DROP DATABASE IF EXISTS $db_name;\""
+            kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U master_user -d master -c \"CREATE DATABASE $db_name;\""
+            kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U master_user -d master -c \"GRANT ALL PRIVILEGES ON DATABASE $db_name TO $db_user;\""
         else
             echo "Creating database $db_name..."
             kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U master_user -d master -c \"CREATE DATABASE $db_name;\""
