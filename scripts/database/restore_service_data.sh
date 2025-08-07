@@ -143,11 +143,16 @@ restore_database() {
             echo "Database $db_name exists, checking for active connections..."
             
             # Check active connections (more reliable method)
-            active_connections_result=$(kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U master_user -d master -c \"SELECT COUNT(*) FROM pg_stat_activity WHERE datname = '$db_name';\" 2>/dev/null | tail -n 1 | grep -E '^[0-9]+$' || echo '0'")
+            active_connections_result=$(kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U master_user -d master -c \"SELECT COUNT(*) FROM pg_stat_activity WHERE datname = '$db_name';\" 2>/dev/null | grep -E '^[[:space:]]*[0-9]+[[:space:]]*$' | tr -d ' ' || echo '0'")
             
             echo "Active connections to $db_name: $active_connections_result"
             
-            if [ "$active_connections_result" -gt 0 ]; then
+            # If we can't determine connections reliably, assume there are active connections
+            if [ "$active_connections_result" -gt 0 ] || [ "$active_connections_result" = "0" ]; then
+                echo "⚠️  Assuming database $db_name has active connections. Skipping drop/recreate, will restore data directly."
+                # Just grant privileges if needed
+                kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U master_user -d master -c \"GRANT ALL PRIVILEGES ON DATABASE $db_name TO $db_user;\" 2>/dev/null || true"
+            else
                 echo "⚠️  Database $db_name has $active_connections_result active connections. Skipping drop/recreate, will restore data directly."
                 # Just grant privileges if needed
                 kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U master_user -d master -c \"GRANT ALL PRIVILEGES ON DATABASE $db_name TO $db_user;\" 2>/dev/null || true"
