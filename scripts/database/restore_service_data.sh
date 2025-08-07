@@ -135,10 +135,14 @@ restore_database() {
         
         # Check if database exists and has active connections
         echo "Checking database $db_name status..."
-        db_exists=$(kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U master_user -d master -c \"SELECT 1 FROM pg_database WHERE datname = '$db_name';\" 2>/dev/null | grep -c '1' || echo '0'")
         
-        if [ "$db_exists" = "1" ]; then
+        # Check if database exists (more reliable method)
+        db_exists_result=$(kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U master_user -d master -c \"SELECT datname FROM pg_database WHERE datname = '$db_name';\" 2>/dev/null | grep -c '$db_name' || echo '0'")
+        
+        if [ "$db_exists_result" = "1" ]; then
             echo "Database $db_name exists, checking for active connections..."
+            
+            # Check active connections
             active_connections=$(kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U master_user -d master -c \"SELECT COUNT(*) FROM pg_stat_activity WHERE datname = '$db_name';\" 2>/dev/null | grep -E '^[0-9]+$' || echo '0'")
             
             if [ "$active_connections" -gt 0 ]; then
