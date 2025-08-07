@@ -135,9 +135,9 @@ restore_database() {
         
         # Drop and recreate database
         echo "Dropping and recreating $db_name..."
-        kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U postgres -c \"DROP DATABASE IF EXISTS $db_name;\""
-        kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U postgres -c \"CREATE DATABASE $db_name;\""
-        kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U postgres -c \"GRANT ALL PRIVILEGES ON DATABASE $db_name TO $db_user;\""
+        kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U master_user -c \"DROP DATABASE IF EXISTS $db_name;\""
+        kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U master_user -c \"CREATE DATABASE $db_name;\""
+        kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U master_user -c \"GRANT ALL PRIVILEGES ON DATABASE $db_name TO $db_user;\""
         
         # Restore data
         echo "Restoring data to $db_name..."
