@@ -133,11 +133,29 @@ restore_database() {
     if base64 "$BACKUP_DIR/$backup_file" | kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "base64 -d > /tmp/$backup_file"; then
         echo "✅ File uploaded successfully"
         
-        # Drop and recreate database
-        echo "Dropping and recreating $db_name..."
-        kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U master_user -d master -c \"DROP DATABASE IF EXISTS $db_name;\""
-        kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U master_user -d master -c \"CREATE DATABASE $db_name;\""
-        kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U master_user -d master -c \"GRANT ALL PRIVILEGES ON DATABASE $db_name TO $db_user;\""
+        # Check if database exists and has active connections
+        echo "Checking database $db_name status..."
+        db_exists=$(kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U master_user -d master -c \"SELECT 1 FROM pg_database WHERE datname = '$db_name';\" 2>/dev/null | grep -c '1' || echo '0'")
+        
+        if [ "$db_exists" = "1" ]; then
+            echo "Database $db_name exists, checking for active connections..."
+            active_connections=$(kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U master_user -d master -c \"SELECT COUNT(*) FROM pg_stat_activity WHERE datname = '$db_name';\" 2>/dev/null | grep -E '^[0-9]+$' || echo '0'")
+            
+            if [ "$active_connections" -gt 0 ]; then
+                echo "⚠️  Database $db_name has $active_connections active connections. Skipping drop/recreate, will restore data directly."
+                # Just grant privileges if needed
+                kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U master_user -d master -c \"GRANT ALL PRIVILEGES ON DATABASE $db_name TO $db_user;\" 2>/dev/null || true"
+            else
+                echo "Dropping and recreating $db_name..."
+                kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U master_user -d master -c \"DROP DATABASE IF EXISTS $db_name;\""
+                kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U master_user -d master -c \"CREATE DATABASE $db_name;\""
+                kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U master_user -d master -c \"GRANT ALL PRIVILEGES ON DATABASE $db_name TO $db_user;\""
+            fi
+        else
+            echo "Creating database $db_name..."
+            kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U master_user -d master -c \"CREATE DATABASE $db_name;\""
+            kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U master_user -d master -c \"GRANT ALL PRIVILEGES ON DATABASE $db_name TO $db_user;\""
+        fi
         
         # Restore data
         echo "Restoring data to $db_name..."
