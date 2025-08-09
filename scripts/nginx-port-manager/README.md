@@ -104,8 +104,8 @@ sudo /tmp/nginx_manager.sh update
 1. Extracts current ports from `kurtosis enclave inspect cdk`
 2. Creates backup of current nginx configurations
 3. Generates new configurations with current ports
-4. Validates nginx configuration (`nginx -t`)
-5. Reloads nginx or restores from backup on errors
+4. Validates nginx configuration (`docker exec attractor-nginx nginx -t`)
+5. Reloads nginx via `docker compose up -d` or restores from backup on errors
 
 ## Files created in the system
 
@@ -142,8 +142,8 @@ sudo journalctl -u nginx-port-updater.service -f
 sudo tail -f /var/log/nginx-port-updater.log
 
 # Check nginx
-sudo nginx -t
-sudo systemctl status nginx
+docker exec attractor-nginx nginx -t
+docker ps | grep attractor-nginx
 
 # Check enclave
 kurtosis enclave inspect cdk
@@ -152,7 +152,8 @@ kurtosis enclave inspect cdk
 ## Requirements
 
 - **Kurtosis CLI** installed and available
-- **nginx** installed and running
+- **Docker and Docker Compose** installed and running
+- **nginx** running in docker container (attractor-nginx)
 - **systemd** (for auto-update)
 - **Root privileges** for nginx configuration changes
 - **CDK enclave** running in Kurtosis
@@ -165,5 +166,5 @@ sudo ./nginx_manager.sh stop
 
 # Restore nginx configurations from backup
 sudo cp /opt/attractor/nginx/conf.d/backup/*.conf /opt/attractor/nginx/conf.d/
-sudo systemctl reload nginx
+cd /opt/attractor && sudo docker compose up -d
 ``` 

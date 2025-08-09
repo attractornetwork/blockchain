@@ -45,38 +45,38 @@ log() {
     esac
 }
 
-# Показать помощь
+# Show help
 show_help() {
     cat << EOF
-Обновление портов nginx для Kurtosis CDK
+Nginx port update for Kurtosis CDK
 
-ИСПОЛЬЗОВАНИЕ:
-    sudo $0 [ОПЦИИ] [ENCLAVE_NAME]
+USAGE:
+    sudo $0 [OPTIONS] [ENCLAVE_NAME]
 
-АРГУМЕНТЫ:
-    ENCLAVE_NAME    Имя Kurtosis энклава (по умолчанию: cdk)
+ARGUMENTS:
+    ENCLAVE_NAME    Kurtosis enclave name (default: cdk)
 
-ОПЦИИ:
-    -h, --help      Показать эту справку
-    -v, --verbose   Подробный вывод
-    -d, --dry-run   Показать что будет сделано без применения изменений
-    --no-backup     Не создавать бэкап (не рекомендуется)
+OPTIONS:
+    -h, --help      Show this help
+    -v, --verbose   Verbose output
+    -d, --dry-run   Show what would be done without applying changes
+    --no-backup     Do not create backup (not recommended)
 
-ПЕРЕМЕННЫЕ ОКРУЖЕНИЯ:
-    NGINX_CONF_DIR  Путь к конфигурациям nginx (по умолчанию: /opt/attractor/nginx/conf.d)
-    BACKUP_DIR      Путь для бэкапов (по умолчанию: /opt/attractor/nginx/conf.d/backup)
-    LOG_FILE        Файл логов (по умолчанию: /var/log/nginx-port-updater.log)
+ENVIRONMENT VARIABLES:
+    NGINX_CONF_DIR  Path to nginx configurations (default: /opt/attractor/nginx/conf.d)
+    BACKUP_DIR      Path for backups (default: /opt/attractor/nginx/conf.d/backup)
+    LOG_FILE        Log file (default: /var/log/nginx-port-updater.log)
 
-ПРИМЕРЫ:
-    sudo $0                         # Обновить порты для энклава 'cdk'
-    sudo $0 my-enclave             # Обновить порты для энклава 'my-enclave'
-    sudo $0 --dry-run              # Показать что будет сделано
-    sudo $0 --verbose cdk          # Подробный вывод для энклава 'cdk'
+EXAMPLES:
+    sudo $0                         # Update ports for 'cdk' enclave
+    sudo $0 my-enclave             # Update ports for 'my-enclave' enclave
+    sudo $0 --dry-run              # Show what would be done
+    sudo $0 --verbose cdk          # Verbose output for 'cdk' enclave
 
 EOF
 }
 
-# Парсинг аргументов
+# Parse arguments
 VERBOSE=false
 DRY_RUN=false
 NO_BACKUP=false
@@ -100,7 +100,7 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         -*)
-            log "ERROR" "Неизвестная опция: $1"
+            log "ERROR" "Unknown option: $1"
             exit 1
             ;;
         *)
@@ -110,32 +110,32 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Функция для создания бэкапа конфигов
+# Function to create config backup
 backup_configs() {
     if [[ "$NO_BACKUP" == "true" ]]; then
-        log "WARNING" "Пропуск создания бэкапа (--no-backup)"
+        log "WARNING" "Skipping backup creation (--no-backup)"
         return 0
     fi
     
-    log "INFO" "Создание бэкапа nginx конфигураций..."
+    log "INFO" "Creating nginx configuration backup..."
     
     if [[ "$DRY_RUN" == "true" ]]; then
-        log "INFO" "[DRY-RUN] Создал бы бэкап в: $BACKUP_DIR"
+        log "INFO" "[DRY-RUN] Would create backup in: $BACKUP_DIR"
         return 0
     fi
     
     mkdir -p "$BACKUP_DIR"
     cp "$NGINX_CONF_DIR"/*.conf "$BACKUP_DIR/" 2>/dev/null || true
-    log "SUCCESS" "Бэкап создан в $BACKUP_DIR"
+    log "SUCCESS" "Backup created in $BACKUP_DIR"
 }
 
-# Функция для получения портов из Kurtosis
+# Function to get ports from Kurtosis
 get_service_ports() {
     local service_name="$1"
     local port_type="$2"
     
     if [[ "$VERBOSE" == "true" ]]; then
-        log "INFO" "Поиск порта для сервиса: $service_name, тип: $port_type"
+        log "INFO" "Searching port for service: $service_name, type: $port_type"
     fi
     
     local port=$(kurtosis enclave inspect "$ENCLAVE_NAME" 2>/dev/null | \
@@ -148,67 +148,67 @@ get_service_ports() {
     echo "$port"
 }
 
-# Функция для получения всех портов
+# Function to extract all ports
 extract_ports() {
-    log "INFO" "Извлечение портов из энклава '$ENCLAVE_NAME'..."
+    log "INFO" "Extracting ports from enclave '$ENCLAVE_NAME'..."
     
-    # RPC сервис (cdk-erigon-sequencer)
+    # RPC service (cdk-erigon-sequencer)
     RPC_HTTP_PORT=$(get_service_ports "cdk-erigon-sequencer" "rpc")
     RPC_WS_PORT=$(get_service_ports "cdk-erigon-sequencer" "ws-rpc")
     
-    # Explorer сервисы
+    # Explorer services
     EXPLORER_FRONTEND_PORT=$(get_service_ports "bs-frontend" "frontend")
     EXPLORER_API_PORT=$(get_service_ports "bs-backend" "backend")
     EXPLORER_STATS_PORT=$(get_service_ports "bs-stats" "stats")
-    EXPLORER_SOCKET_PORT="$RPC_WS_PORT"  # Используем тот же WS порт
+    EXPLORER_SOCKET_PORT="$RPC_WS_PORT"  # Use same WS port
     
     # Bridge UI
     BRIDGE_UI_PORT=$(get_service_ports "zkevm-bridge-ui" "web-ui")
     
-    # DAC сервис
+    # DAC service
     DAC_PORT=$(get_service_ports "zkevm-dac" "dac")
     
-    # Faucet (если есть)
+    # Faucet (if available)
     FAUCET_PORT=$(get_service_ports "faucet" "web")
     
-    # Показываем найденные порты
-    log "SUCCESS" "Найденные порты:"
-    echo "  RPC HTTP: ${RPC_HTTP_PORT:-не найден}"
-    echo "  RPC WebSocket: ${RPC_WS_PORT:-не найден}"
-    echo "  Explorer Frontend: ${EXPLORER_FRONTEND_PORT:-не найден}"
-    echo "  Explorer API: ${EXPLORER_API_PORT:-не найден}"
-    echo "  Explorer Stats: ${EXPLORER_STATS_PORT:-не найден}"
-    echo "  Bridge UI: ${BRIDGE_UI_PORT:-не найден}"
-    echo "  DAC: ${DAC_PORT:-не найден}"
-    echo "  Faucet: ${FAUCET_PORT:-не найден}"
+    # Show found ports
+    log "SUCCESS" "Found ports:"
+    echo "  RPC HTTP: ${RPC_HTTP_PORT:-not found}"
+    echo "  RPC WebSocket: ${RPC_WS_PORT:-not found}"
+    echo "  Explorer Frontend: ${EXPLORER_FRONTEND_PORT:-not found}"
+    echo "  Explorer API: ${EXPLORER_API_PORT:-not found}"
+    echo "  Explorer Stats: ${EXPLORER_STATS_PORT:-not found}"
+    echo "  Bridge UI: ${BRIDGE_UI_PORT:-not found}"
+    echo "  DAC: ${DAC_PORT:-not found}"
+    echo "  Faucet: ${FAUCET_PORT:-not found}"
 }
 
-# Функция для создания конфигурации
+# Function to create configuration
 create_config() {
     local service_name="$1"
     local config_file="$2"
     local template="$3"
     
     if [[ "$DRY_RUN" == "true" ]]; then
-        log "INFO" "[DRY-RUN] Создал бы конфигурацию: $config_file"
+        log "INFO" "[DRY-RUN] Would create configuration: $config_file"
         return 0
     fi
     
     echo "$template" > "$config_file.tmp"
     mv "$config_file.tmp" "$config_file"
-    log "SUCCESS" "$service_name конфигурация обновлена"
+    log "SUCCESS" "$service_name configuration updated"
 }
 
-# Функция для обновления RPC конфигурации
+# Function to update RPC configuration
 update_rpc_config() {
     local config_file="$NGINX_CONF_DIR/rpc.testnet.attra.me.conf"
     
     if [[ -z "$RPC_HTTP_PORT" || -z "$RPC_WS_PORT" ]]; then
-        log "ERROR" "Не удалось найти порты для RPC сервиса"
+        log "ERROR" "Failed to find ports for RPC service"
         return 1
     fi
     
-    log "INFO" "Обновление RPC конфигурации (HTTP: $RPC_HTTP_PORT, WS: $RPC_WS_PORT)..."
+    log "INFO" "Updating RPC configuration (HTTP: $RPC_HTTP_PORT, WS: $RPC_WS_PORT)..."
     
     local template="map \$http_upgrade \$connection_upgrade {
     default   Upgrade;
@@ -268,16 +268,16 @@ server {
     create_config "RPC" "$config_file" "$template"
 }
 
-# Функция для обновления Explorer конфигурации
+# Function to update Explorer configuration
 update_explorer_config() {
     local config_file="$NGINX_CONF_DIR/explorer.testnet.attra.me.conf"
     
     if [[ -z "$EXPLORER_FRONTEND_PORT" || -z "$EXPLORER_API_PORT" || -z "$EXPLORER_STATS_PORT" ]]; then
-        log "ERROR" "Не удалось найти порты для Explorer сервиса"
+        log "ERROR" "Failed to find ports for Explorer service"
         return 1
     fi
     
-    log "INFO" "Обновление Explorer конфигурации (Frontend: $EXPLORER_FRONTEND_PORT, API: $EXPLORER_API_PORT, Stats: $EXPLORER_STATS_PORT)..."
+    log "INFO" "Updating Explorer configuration (Frontend: $EXPLORER_FRONTEND_PORT, API: $EXPLORER_API_PORT, Stats: $EXPLORER_STATS_PORT)..."
     
     local template="map \$request_uri \$explorer_backend_port {
     ~^/api/            $EXPLORER_API_PORT;
@@ -333,16 +333,16 @@ server {
     create_config "Explorer" "$config_file" "$template"
 }
 
-# Функция для обновления Bridge конфигурации
+# Function to update Bridge configuration
 update_bridge_config() {
     local config_file="$NGINX_CONF_DIR/bridge.testnet.attra.me.conf"
     
     if [[ -z "$BRIDGE_UI_PORT" ]]; then
-        log "WARNING" "Не удалось найти порт для Bridge UI, пропускаем"
+        log "WARNING" "Failed to find port for Bridge UI, skipping"
         return 0
     fi
     
-    log "INFO" "Обновление Bridge конфигурации (Port: $BRIDGE_UI_PORT)..."
+    log "INFO" "Updating Bridge configuration (Port: $BRIDGE_UI_PORT)..."
     
     local template="server {
     listen 443 ssl http2;
@@ -386,16 +386,16 @@ server {
     create_config "Bridge" "$config_file" "$template"
 }
 
-# Функция для обновления DAC конфигурации
+# Function to update DAC configuration
 update_dac_config() {
     local config_file="$NGINX_CONF_DIR/da.testnet.attra.me.conf"
     
     if [[ -z "$DAC_PORT" ]]; then
-        log "WARNING" "Не удалось найти порт для DAC сервиса, пропускаем"
+        log "WARNING" "Failed to find port for DAC service, skipping"
         return 0
     fi
     
-    log "INFO" "Обновление DAC конфигурации (Port: $DAC_PORT)..."
+    log "INFO" "Updating DAC configuration (Port: $DAC_PORT)..."
     
     local template="server {
     listen 443 ssl http2;
@@ -435,16 +435,16 @@ server {
     create_config "DAC" "$config_file" "$template"
 }
 
-# Функция для обновления Faucet конфигурации
+# Function to update Faucet configuration
 update_faucet_config() {
     local config_file="$NGINX_CONF_DIR/faucet.testnet.attra.me.conf"
     
     if [[ -z "$FAUCET_PORT" ]]; then
-        log "INFO" "Faucet сервис не найден, пропускаем"
+        log "INFO" "Faucet service not found, skipping"
         return 0
     fi
     
-    log "INFO" "Обновление Faucet конфигурации (Port: $FAUCET_PORT)..."
+    log "INFO" "Updating Faucet configuration (Port: $FAUCET_PORT)..."
     
     local template="server {
     listen 443 ssl http2;
@@ -484,95 +484,104 @@ server {
     create_config "Faucet" "$config_file" "$template"
 }
 
-# Функция для проверки nginx конфигурации
+# Function to test nginx configuration
 test_nginx_config() {
-    log "INFO" "Проверка nginx конфигурации..."
+    log "INFO" "Testing nginx configuration..."
     
     if [[ "$DRY_RUN" == "true" ]]; then
-        log "INFO" "[DRY-RUN] Проверил бы nginx конфигурацию"
+        log "INFO" "[DRY-RUN] Would check nginx configuration"
         return 0
     fi
     
-    if nginx -t >/dev/null 2>&1; then
-        log "SUCCESS" "Nginx конфигурация корректна"
+    # Test nginx configuration using docker
+    if docker exec attractor-nginx nginx -t >/dev/null 2>&1; then
+        log "SUCCESS" "Nginx configuration is valid"
         return 0
     else
-        log "ERROR" "Nginx конфигурация содержит ошибки:"
-        nginx -t
+        log "ERROR" "Nginx configuration contains errors:"
+        docker exec attractor-nginx nginx -t
         return 1
     fi
 }
 
-# Функция для перезагрузки nginx
+# Function to reload nginx via docker compose
 reload_nginx() {
-    log "INFO" "Перезагрузка nginx..."
+    log "INFO" "Reloading nginx via docker compose..."
     
     if [[ "$DRY_RUN" == "true" ]]; then
-        log "INFO" "[DRY-RUN] Перезагрузил бы nginx"
+        log "INFO" "[DRY-RUN] Would reload nginx via docker compose"
         return 0
     fi
     
-    if systemctl reload nginx; then
-        log "SUCCESS" "Nginx успешно перезагружен"
+    local docker_compose_dir="/opt/attractor"
+    
+    if [[ ! -f "$docker_compose_dir/docker-compose.yml" ]]; then
+        log "ERROR" "Docker compose file not found: $docker_compose_dir/docker-compose.yml"
+        return 1
+    fi
+    
+    cd "$docker_compose_dir"
+    if docker compose up -d; then
+        log "SUCCESS" "Nginx reloaded successfully via docker compose"
         return 0
     else
-        log "ERROR" "Не удалось перезагрузить nginx"
+        log "ERROR" "Failed to reload nginx via docker compose"
         return 1
     fi
 }
 
-# Функция для восстановления из бэкапа
+# Function to restore from backup
 restore_from_backup() {
     if [[ "$NO_BACKUP" == "true" ]]; then
-        log "ERROR" "Бэкап не был создан (--no-backup), восстановление невозможно"
+        log "ERROR" "Backup was not created (--no-backup), restore impossible"
         return 1
     fi
     
-    log "WARNING" "Восстановление конфигураций из бэкапа..."
+    log "WARNING" "Restoring configurations from backup..."
     
     if [[ "$DRY_RUN" == "true" ]]; then
-        log "INFO" "[DRY-RUN] Восстановил бы конфигурации из бэкапа"
+        log "INFO" "[DRY-RUN] Would restore configurations from backup"
         return 0
     fi
     
     cp "$BACKUP_DIR"/*.conf "$NGINX_CONF_DIR/" 2>/dev/null || true
-    systemctl reload nginx
-    log "SUCCESS" "Конфигурации восстановлены из бэкапа"
+    cd "/opt/attractor" && docker compose up -d
+    log "SUCCESS" "Configurations restored from backup"
 }
 
-# Основная функция
+# Main function
 main() {
-    log "INFO" "Запуск обновления nginx портов для энклава '$ENCLAVE_NAME'"
+    log "INFO" "Starting nginx port update for enclave '$ENCLAVE_NAME'"
     
     if [[ "$DRY_RUN" == "true" ]]; then
-        log "INFO" "Режим DRY-RUN: изменения не будут применены"
+        log "INFO" "DRY-RUN mode: changes will not be applied"
     fi
     
-    # Проверяем права root
+    # Check root privileges
     if [[ $EUID -ne 0 && "$DRY_RUN" == "false" ]]; then
-        log "ERROR" "Требуются права root для изменения конфигураций nginx"
-        log "INFO" "Попробуйте: sudo $0 $*"
+        log "ERROR" "Root privileges required for nginx configuration changes"
+        log "INFO" "Try: sudo $0 $*"
         exit 1
     fi
     
-    # Проверяем, что энклав запущен
+    # Check that enclave is running
     if ! kurtosis enclave inspect "$ENCLAVE_NAME" >/dev/null 2>&1; then
-        log "ERROR" "Энклав '$ENCLAVE_NAME' не найден или не запущен"
-        log "INFO" "Доступные энклавы:"
-        kurtosis enclave ls 2>/dev/null || log "ERROR" "Ошибка получения списка энклавов"
+        log "ERROR" "Enclave '$ENCLAVE_NAME' not found or not running"
+        log "INFO" "Available enclaves:"
+        kurtosis enclave ls 2>/dev/null || log "ERROR" "Error getting enclave list"
         exit 1
     fi
     
-    # Создаем лог файл если нужно
+    # Create log file if needed
     mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null || true
     
-    # Создаем бэкап
+    # Create backup
     backup_configs
     
-    # Извлекаем порты
+    # Extract ports
     extract_ports
     
-    # Обновляем конфигурации
+    # Update configurations
     local configs_updated=0
     
     if update_rpc_config; then
@@ -596,15 +605,15 @@ main() {
     fi
     
     if [[ $configs_updated -eq 0 ]]; then
-        log "WARNING" "Ни одна конфигурация не была обновлена"
+        log "WARNING" "No configurations were updated"
         exit 1
     fi
     
-    # Проверяем конфигурацию
+    # Check configuration
     if test_nginx_config; then
-        # Перезагружаем nginx
+        # Reload nginx
         if reload_nginx; then
-            log "SUCCESS" "Обновление портов завершено успешно! Обновлено конфигураций: $configs_updated"
+            log "SUCCESS" "Port update completed successfully! Updated configurations: $configs_updated"
         else
             restore_from_backup
             exit 1
@@ -615,5 +624,5 @@ main() {
     fi
 }
 
-# Запуск скрипта
+# Run script
 main "$@" 

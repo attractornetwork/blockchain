@@ -12,7 +12,7 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Функция логирования
+# Logging function
 log() {
     local level="$1"
     shift
@@ -34,33 +34,33 @@ log() {
     esac
 }
 
-# Показать помощь
+# Show help
 show_help() {
     cat << EOF
-Запуск автоматического обновления nginx портов для Kurtosis CDK
+Start automatic nginx port updates for Kurtosis CDK
 
-ИСПОЛЬЗОВАНИЕ:
-    sudo $0 [ОПЦИИ]
+USAGE:
+    sudo $0 [OPTIONS]
 
-ОПЦИИ:
-    -h, --help      Показать эту справку
-    -f, --force     Принудительная переустановка сервисов
-    --no-timer      Не запускать таймер (только разовый запуск при загрузке)
-    --interval=N    Интервал проверки в минутах (по умолчанию: 5)
+OPTIONS:
+    -h, --help      Show this help
+    -f, --force     Force reinstallation of services
+    --no-timer      Do not start timer (only run on boot)
+    --interval=N    Check interval in minutes (default: 5)
 
-ОПИСАНИЕ:
-    Этот скрипт устанавливает и активирует systemd сервисы для автоматического 
-    обновления nginx конфигурации при изменении портов Kurtosis энклава.
+DESCRIPTION:
+    This script installs and activates systemd services for automatic 
+    nginx configuration updates when Kurtosis enclave ports change.
 
-    Автоматическое обновление будет выполняться:
-    - При загрузке системы (через 2 минуты)
-    - Периодически каждые N минут (по умолчанию 5)
+    Automatic updates will run:
+    - On system boot (after 2 minutes)
+    - Periodically every N minutes (default 5)
 
-ПРИМЕРЫ:
-    sudo $0                           # Стандартная установка
-    sudo $0 --force                   # Переустановка сервисов
-    sudo $0 --no-timer                # Только при загрузке системы
-    sudo $0 --interval=10             # Проверка каждые 10 минут
+EXAMPLES:
+    sudo $0                           # Standard installation
+    sudo $0 --force                   # Reinstall services
+    sudo $0 --no-timer                # Only on system boot
+    sudo $0 --interval=10             # Check every 10 minutes
 
 EOF
 }
