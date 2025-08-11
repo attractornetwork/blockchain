@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Create backup of all service databases
+# Create backup of all service databases of L2 Attractor
 # Usage: ./scripts/create_backup.sh <enclave_name> [backup_directory]
 
 set -e
@@ -38,9 +38,27 @@ service_exists() {
     kurtosis enclave inspect "$ENCLAVE_NAME" | grep -q "[[:space:]]${service}[[:space:]]"
 }
 
-# Create backup directory
-echo "Creating backup directory: $BACKUP_DIR"
-mkdir -p "$BACKUP_DIR"
+# Function to check if service is running
+service_is_running() {
+    local service=$1
+    kurtosis enclave inspect "$ENCLAVE_NAME" | grep -A 2 "[[:space:]]${service}[[:space:]]" | grep -q "RUNNING"
+}
+
+# Prepare backup directory (clean if exists, else create)
+echo "Preparing backup directory: $BACKUP_DIR"
+if [ -d "$BACKUP_DIR" ]; then
+    echo "Cleaning existing backup directory contents..."
+    # Safety checks to avoid catastrophic deletion
+    if [ -z "$BACKUP_DIR" ] || [ "$BACKUP_DIR" = "/" ]; then
+        echo "ERROR: Refusing to clean unsafe backup directory path: '$BACKUP_DIR'"
+        exit 1
+    fi
+    # Remove all contents inside the directory without deleting the directory itself
+    find "$BACKUP_DIR" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+else
+    echo "Creating backup directory..."
+    mkdir -p "$BACKUP_DIR"
+fi
 
 # Check if postgres service exists for backup
 POSTGRES_SERVICE="postgres-001"
@@ -79,13 +97,13 @@ BACKUP_COUNT=0
 for db_name in "${!DATABASES[@]}"; do
     db_user="${DATABASES[$db_name]}"
     backup_file="${db_name}_backup.sql"
-    
+
     echo "Backing up $db_name database..."
-    
+
     # Try to backup the database
     if kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password pg_dump -U $db_user -d $db_name > /tmp/$backup_file" 2>/dev/null; then
         echo "✅ Successfully backed up $db_name"
-        
+
         # Check if the backup file was created and has content
         file_size=$(kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "ls -lh /tmp/$backup_file 2>/dev/null | awk '{print \$5}' || echo '0'")
         if [ "$file_size" != "0" ] && [ "$file_size" != "" ]; then
@@ -93,35 +111,24 @@ for db_name in "${!DATABASES[@]}"; do
         else
             echo "⚠️  Backup file appears to be empty or missing"
         fi
-        
-        # Download the backup file using base64 transfer
-        echo "Downloading $backup_file from container..."
-        
-        # Use base64 to transfer the file content
-        if kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "cat /tmp/$backup_file | base64" > "$BACKUP_DIR/${backup_file}.b64" 2>/dev/null; then
-            # Decode the base64 file
-            if base64 -d "$BACKUP_DIR/${backup_file}.b64" > "$BACKUP_DIR/$backup_file" 2>/dev/null; then
-                echo "✅ Downloaded $backup_file to $BACKUP_DIR"
-                # Verify the file was actually downloaded
-                if [ -f "$BACKUP_DIR/$backup_file" ]; then
-                    file_size=$(du -h "$BACKUP_DIR/$backup_file" | cut -f1)
-                    echo "✅ File verified: $backup_file ($file_size)"
-                    BACKUP_COUNT=$((BACKUP_COUNT + 1))
-                    # Clean up the base64 file
-                    rm -f "$BACKUP_DIR/${backup_file}.b64"
-                else
-                    echo "❌ File download failed - file not found in $BACKUP_DIR"
-                    BACKUP_SUCCESS=false
-                fi
+
+        # Download the backup file via base64 stream into the specified backup directory
+        echo "Downloading $backup_file from container via base64..."
+        if kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "base64 /tmp/$backup_file" > "$BACKUP_DIR/$backup_file.b64"; then
+            if base64 -d "$BACKUP_DIR/$backup_file.b64" > "$BACKUP_DIR/$backup_file"; then
+                rm -f "$BACKUP_DIR/$backup_file.b64"
+                file_size=$(du -h "$BACKUP_DIR/$backup_file" | cut -f1)
+                echo "✅ Downloaded $backup_file to $BACKUP_DIR ($file_size)"
+                BACKUP_COUNT=$((BACKUP_COUNT + 1))
             else
-                echo "❌ Failed to decode base64 file for $backup_file"
+                echo "❌ Failed to decode $backup_file from base64"
                 BACKUP_SUCCESS=false
             fi
         else
-            echo "❌ Failed to download $backup_file using base64 transfer"
+            echo "❌ Failed to transfer $backup_file via base64"
             BACKUP_SUCCESS=false
         fi
-        
+
         # Clean up the file from container
         kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "rm -f /tmp/$backup_file"
     else
@@ -132,33 +139,68 @@ done
 echo ""
 echo "=== BACKING UP BLOCKCHAIN DATA (ERIGON) ==="
 
-# Проверяем наличие Erigon sequencer
-ERIGON_SEQUENCER="cdk-erigon-sequencer-001"
-if service_exists "$ERIGON_SEQUENCER"; then
-    echo "Backing up blockchain data from $ERIGON_SEQUENCER..."
-    # Создаем архив данных блокчейна
-    if kurtosis service exec "$ENCLAVE_NAME" "$ERIGON_SEQUENCER" "tar -czf /tmp/blockchain_data_backup.tar.gz -C /home/erigon/data dynamic-Attractor-sequencer"; then
-        echo "✅ Blockchain data archive created"
-        # Проверяем размер архива
-        kurtosis service exec "$ENCLAVE_NAME" "$ERIGON_SEQUENCER" "ls -lh /tmp/blockchain_data_backup.tar.gz"
-        # Скачиваем архив через base64
-        if kurtosis service exec "$ENCLAVE_NAME" "$ERIGON_SEQUENCER" "base64 /tmp/blockchain_data_backup.tar.gz" > "$BACKUP_DIR/blockchain_data_backup.tar.gz.b64"; then
-            # Декодируем на хосте
-            if base64 -d "$BACKUP_DIR/blockchain_data_backup.tar.gz.b64" > "$BACKUP_DIR/blockchain_data_backup.tar.gz"; then
-                rm "$BACKUP_DIR/blockchain_data_backup.tar.gz.b64"
-                echo "✅ Blockchain data archive downloaded and decoded: $BACKUP_DIR/blockchain_data_backup.tar.gz"
+# Общая функция бэкапа датадира Erigon с остановкой сервиса
+backup_erigon_datadir() {
+    local service_name="$1"
+    local out_file_name="$2"
+
+    if ! service_exists "$service_name"; then
+        echo "No service '$service_name' found, skipping"
+        return 0
+    fi
+
+    echo "Preparing to backup blockchain data from $service_name..."
+
+    if service_is_running "$service_name"; then
+        # Online archive without stopping the service
+        if kurtosis service exec "$ENCLAVE_NAME" "$service_name" "tar -czf /tmp/${out_file_name}.tar.gz -C /home/erigon/data dynamic-Attractor-sequencer"; then
+            echo "✅ Blockchain data archive created for $service_name"
+            kurtosis service exec "$ENCLAVE_NAME" "$service_name" "ls -lh /tmp/${out_file_name}.tar.gz"
+
+            # Download archive via base64 stream into the specified backup directory
+            echo "Downloading archive via base64 transfer..."
+            if kurtosis service exec "$ENCLAVE_NAME" "$service_name" "base64 /tmp/${out_file_name}.tar.gz" > "$BACKUP_DIR/${out_file_name}.tar.gz.b64"; then
+                if base64 -d "$BACKUP_DIR/${out_file_name}.tar.gz.b64" > "$BACKUP_DIR/${out_file_name}.tar.gz"; then
+                    rm -f "$BACKUP_DIR/${out_file_name}.tar.gz.b64"
+                    echo "✅ Archive saved: $BACKUP_DIR/${out_file_name}.tar.gz"
+                else
+                    echo "❌ Failed to decode archive: $BACKUP_DIR/${out_file_name}.tar.gz.b64"
+                fi
+                # Clean up the file from container
+                kurtosis service exec "$ENCLAVE_NAME" "$service_name" "rm -f /tmp/${out_file_name}.tar.gz" || true
             else
-                echo "❌ Failed to decode blockchain data archive!"
+                echo "❌ Failed to transfer archive via base64 for ${out_file_name}.tar.gz"
             fi
         else
-            echo "❌ Failed to download blockchain data archive via base64!"
+            echo "❌ Failed to create $out_file_name archive in container"
         fi
     else
-        echo "❌ Failed to create blockchain data archive in container!"
+        echo "Service $service_name is not running; attempting offline copy via docker cp..."
+        # Try to locate container (stopped) and copy data out
+        CONTAINER_ID=$(sudo docker ps -a | grep -F "${service_name}--" | awk '{print $1}' | head -n1)
+        if [ -z "$CONTAINER_ID" ]; then
+            echo "❌ Could not find container ID for $service_name; skipping blockchain backup"
+            return 0
+        fi
+        TMP_DIR=$(mktemp -d)
+        echo "Copying datadir from container $CONTAINER_ID..."
+        if sudo docker cp "$CONTAINER_ID:/home/erigon/data/dynamic-Attractor-sequencer" "$TMP_DIR/"; then
+            echo "Creating archive..."
+            tar -czf "$BACKUP_DIR/${out_file_name}.tar.gz" -C "$TMP_DIR" dynamic-Attractor-sequencer && echo "✅ Archive saved: $BACKUP_DIR/${out_file_name}.tar.gz"
+        else
+            echo "❌ Failed to copy datadir from container"
+        fi
+        rm -rf "$TMP_DIR"
     fi
-else
-    echo "No Erigon sequencer found, skipping blockchain data backup"
-fi
+}
+
+# Бэкап sequencer
+ERIGON_SEQUENCER="cdk-erigon-sequencer-001"
+backup_erigon_datadir "$ERIGON_SEQUENCER" "blockchain_data_backup_sequencer"
+
+# Бэкап rpc-ноды (ускоряет восстановление и проверку транзакций)
+ERIGON_RPC="cdk-erigon-rpc-001"
+backup_erigon_datadir "$ERIGON_RPC" "blockchain_data_backup_rpc"
 
 echo ""
 echo "=== BACKUP SUMMARY ==="
@@ -167,11 +209,11 @@ echo "Successfully backed up: $BACKUP_COUNT database(s)"
 
 if [ "$BACKUP_SUCCESS" = true ] && [ $BACKUP_COUNT -gt 0 ]; then
     echo "✅ Backup completed successfully!"
-    
+
     echo ""
     echo "=== BACKUP CONTENTS ==="
     ls -la "$BACKUP_DIR"
-    
+
     echo ""
     echo "=== BACKUP VERIFICATION ==="
     echo "You can verify the backup by checking file sizes:"
@@ -181,7 +223,7 @@ if [ "$BACKUP_SUCCESS" = true ] && [ $BACKUP_COUNT -gt 0 ]; then
             echo "  $(basename "$file"): $size"
         fi
     done
-    
+
     echo ""
     echo "=== USAGE EXAMPLES ==="
     echo "To restore from this backup:"
@@ -193,7 +235,7 @@ if [ "$BACKUP_SUCCESS" = true ] && [ $BACKUP_COUNT -gt 0 ]; then
     echo "To manually restore a specific database:"
     echo "  kurtosis service files upload $ENCLAVE_NAME postgres-001 $BACKUP_DIR/<db_name>_backup.sql /tmp/"
     echo "  kurtosis service exec $ENCLAVE_NAME postgres-001 'PGPASSWORD=master_password psql -U <user> -d <db_name> < /tmp/<db_name>_backup.sql'"
-    
+
     # Create a metadata file with backup information
     cat > "$BACKUP_DIR/backup_info.txt" << EOF
 Backup Information
@@ -213,8 +255,11 @@ EOF
         fi
     done
 
-    if [ -f "$BACKUP_DIR/blockchain_data_backup.tar.gz" ]; then
-        echo "  - blockchain_data_backup.tar.gz" >> "$BACKUP_DIR/backup_info.txt"
+    if [ -f "$BACKUP_DIR/blockchain_data_backup_sequencer.tar.gz" ]; then
+        echo "  - blockchain_data_backup_sequencer.tar.gz" >> "$BACKUP_DIR/backup_info.txt"
+    fi
+    if [ -f "$BACKUP_DIR/blockchain_data_backup_rpc.tar.gz" ]; then
+        echo "  - blockchain_data_backup_rpc.tar.gz" >> "$BACKUP_DIR/backup_info.txt"
     fi
 
     cat >> "$BACKUP_DIR/backup_info.txt" << EOF
@@ -225,10 +270,10 @@ Restore commands:
 
 Note: Keep this backup directory until you verify that the restored services are working correctly.
 EOF
-    
+
     echo ""
     echo "📄 Backup metadata saved to: $BACKUP_DIR/backup_info.txt"
-    
+
 else
     echo "❌ Backup failed or no databases were backed up!"
     echo "Please check the logs above for errors."
@@ -238,5 +283,3 @@ fi
 echo ""
 echo "Backup completed successfully!"
 echo "Backup location: $BACKUP_DIR"
-
-exit 0 
