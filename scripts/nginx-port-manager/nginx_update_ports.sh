@@ -27,19 +27,19 @@ log() {
     
     case "$level" in
         "INFO")
-            echo -e "${BLUE}ℹ️  $message${NC}"
+            echo -e "${BLUE}$message${NC}"
             echo "$timestamp [INFO] $message" >> "$LOG_FILE"
             ;;
         "SUCCESS")
-            echo -e "${GREEN}✅ $message${NC}"
+            echo -e "${GREEN}$message${NC}"
             echo "$timestamp [SUCCESS] $message" >> "$LOG_FILE"
             ;;
         "WARNING")
-            echo -e "${YELLOW}⚠️  $message${NC}"
+            echo -e "${YELLOW}$message${NC}"
             echo "$timestamp [WARNING] $message" >> "$LOG_FILE"
             ;;
         "ERROR")
-            echo -e "${RED}❌ $message${NC}"
+            echo -e "${RED}$message${NC}"
             echo "$timestamp [ERROR] $message" >> "$LOG_FILE"
             ;;
     esac
@@ -58,9 +58,6 @@ ARGUMENTS:
 
 OPTIONS:
     -h, --help      Show this help
-    -v, --verbose   Verbose output
-    -d, --dry-run   Show what would be done without applying changes
-    --no-backup     Do not create backup (not recommended)
 
 ENVIRONMENT VARIABLES:
     NGINX_CONF_DIR  Path to nginx configurations (default: /opt/attractor/nginx/conf.d)
@@ -70,16 +67,11 @@ ENVIRONMENT VARIABLES:
 EXAMPLES:
     sudo $0                         # Update ports for 'cdk' enclave
     sudo $0 my-enclave             # Update ports for 'my-enclave' enclave
-    sudo $0 --dry-run              # Show what would be done
-    sudo $0 --verbose cdk          # Verbose output for 'cdk' enclave
 
 EOF
 }
 
 # Parse arguments
-VERBOSE=false
-DRY_RUN=false
-NO_BACKUP=false
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -87,18 +79,7 @@ while [[ $# -gt 0 ]]; do
             show_help
             exit 0
             ;;
-        -v|--verbose)
-            VERBOSE=true
-            shift
-            ;;
-        -d|--dry-run)
-            DRY_RUN=true
-            shift
-            ;;
-        --no-backup)
-            NO_BACKUP=true
-            shift
-            ;;
+
         -*)
             log "ERROR" "Unknown option: $1"
             exit 1
@@ -112,17 +93,11 @@ done
 
 # Function to create config backup
 backup_configs() {
-    if [[ "$NO_BACKUP" == "true" ]]; then
-        log "WARNING" "Skipping backup creation (--no-backup)"
-        return 0
-    fi
+
     
     log "INFO" "Creating nginx configuration backup..."
     
-    if [[ "$DRY_RUN" == "true" ]]; then
-        log "INFO" "[DRY-RUN] Would create backup in: $BACKUP_DIR"
-        return 0
-    fi
+
     
     mkdir -p "$BACKUP_DIR"
     cp "$NGINX_CONF_DIR"/*.conf "$BACKUP_DIR/" 2>/dev/null || true
@@ -134,9 +109,7 @@ get_service_ports() {
     local service_name="$1"
     local port_type="$2"
     
-    if [[ "$VERBOSE" == "true" ]]; then
-        log "INFO" "Searching port for service: $service_name, type: $port_type"
-    fi
+
     
     local port=$(kurtosis enclave inspect "$ENCLAVE_NAME" 2>/dev/null | \
         grep -A 10 "$service_name" | \
@@ -162,15 +135,6 @@ extract_ports() {
     EXPLORER_STATS_PORT=$(get_service_ports "bs-stats" "stats")
     EXPLORER_SOCKET_PORT="$RPC_WS_PORT"  # Use same WS port
     
-    # Bridge UI
-    BRIDGE_UI_PORT=$(get_service_ports "zkevm-bridge-ui" "web-ui")
-    
-    # DAC service
-    DAC_PORT=$(get_service_ports "zkevm-dac" "dac")
-    
-    # Faucet (if available)
-    FAUCET_PORT=$(get_service_ports "faucet" "web")
-    
     # Show found ports
     log "SUCCESS" "Found ports:"
     echo "  RPC HTTP: ${RPC_HTTP_PORT:-not found}"
@@ -178,9 +142,6 @@ extract_ports() {
     echo "  Explorer Frontend: ${EXPLORER_FRONTEND_PORT:-not found}"
     echo "  Explorer API: ${EXPLORER_API_PORT:-not found}"
     echo "  Explorer Stats: ${EXPLORER_STATS_PORT:-not found}"
-    echo "  Bridge UI: ${BRIDGE_UI_PORT:-not found}"
-    echo "  DAC: ${DAC_PORT:-not found}"
-    echo "  Faucet: ${FAUCET_PORT:-not found}"
 }
 
 # Function to create configuration
@@ -189,10 +150,7 @@ create_config() {
     local config_file="$2"
     local template="$3"
     
-    if [[ "$DRY_RUN" == "true" ]]; then
-        log "INFO" "[DRY-RUN] Would create configuration: $config_file"
-        return 0
-    fi
+
     
     echo "$template" > "$config_file.tmp"
     mv "$config_file.tmp" "$config_file"
@@ -333,165 +291,11 @@ server {
     create_config "Explorer" "$config_file" "$template"
 }
 
-# Function to update Bridge configuration
-update_bridge_config() {
-    local config_file="$NGINX_CONF_DIR/bridge.testnet.attra.me.conf"
-    
-    if [[ -z "$BRIDGE_UI_PORT" ]]; then
-        log "WARNING" "Failed to find port for Bridge UI, skipping"
-        return 0
-    fi
-    
-    log "INFO" "Updating Bridge configuration (Port: $BRIDGE_UI_PORT)..."
-    
-    local template="server {
-    listen 443 ssl http2;
-    server_name bridge.testnet.attra.me;
-
-    ssl_certificate     /etc/letsencrypt/live/da.testnet.attra.me/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/da.testnet.attra.me/privkey.pem;
-
-    location / {
-        proxy_pass              http://127.0.0.1:$BRIDGE_UI_PORT;
-        proxy_set_header        Host               \$host;
-        proxy_set_header        X-Real-IP          \$remote_addr;
-        proxy_set_header        X-Forwarded-For    \$proxy_add_x_forwarded_for;
-        proxy_set_header        X-Forwarded-Proto  \$scheme;
-        proxy_http_version      1.1;
-        proxy_set_header        Upgrade            \$http_upgrade;
-        proxy_set_header        Connection         \"upgrade\";
-    }
-}
-
-server {
-    listen 80;
-    server_name bridge.testnet.attra.me;
-
-    location /.well-known/acme-challenge/ {
-        root /var/www/certbot;
-    }
-
-    location / {
-        proxy_pass              http://127.0.0.1:$BRIDGE_UI_PORT;
-        proxy_set_header        Host               \$host;
-        proxy_set_header        X-Real-IP          \$remote_addr;
-        proxy_set_header        X-Forwarded-For    \$proxy_add_x_forwarded_for;
-        proxy_set_header        X-Forwarded-Proto  \$scheme;
-        proxy_http_version      1.1;
-        proxy_set_header        Upgrade            \$http_upgrade;
-        proxy_set_header        Connection         \"upgrade\";
-    }
-}"
-
-    create_config "Bridge" "$config_file" "$template"
-}
-
-# Function to update DAC configuration
-update_dac_config() {
-    local config_file="$NGINX_CONF_DIR/da.testnet.attra.me.conf"
-    
-    if [[ -z "$DAC_PORT" ]]; then
-        log "WARNING" "Failed to find port for DAC service, skipping"
-        return 0
-    fi
-    
-    log "INFO" "Updating DAC configuration (Port: $DAC_PORT)..."
-    
-    local template="server {
-    listen 443 ssl http2;
-    server_name da.testnet.attra.me;
-
-    ssl_certificate     /etc/letsencrypt/live/da.testnet.attra.me/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/da.testnet.attra.me/privkey.pem;
-
-    location / {
-        proxy_pass              http://127.0.0.1:$DAC_PORT;
-        proxy_set_header        Host               \$host;
-        proxy_set_header        X-Real-IP          \$remote_addr;
-        proxy_set_header        X-Forwarded-For    \$proxy_add_x_forwarded_for;
-        proxy_set_header        X-Forwarded-Proto  \$scheme;
-        proxy_http_version      1.1;
-    }
-}
-
-server {
-    listen 80;
-    server_name da.testnet.attra.me;
-
-    location /.well-known/acme-challenge/ {
-        root /var/www/certbot;
-    }
-
-    location / {
-        proxy_pass              http://127.0.0.1:$DAC_PORT;
-        proxy_set_header        Host               \$host;
-        proxy_set_header        X-Real-IP          \$remote_addr;
-        proxy_set_header        X-Forwarded-For    \$proxy_add_x_forwarded_for;
-        proxy_set_header        X-Forwarded-Proto  \$scheme;
-        proxy_http_version      1.1;
-    }
-}"
-
-    create_config "DAC" "$config_file" "$template"
-}
-
-# Function to update Faucet configuration
-update_faucet_config() {
-    local config_file="$NGINX_CONF_DIR/faucet.testnet.attra.me.conf"
-    
-    if [[ -z "$FAUCET_PORT" ]]; then
-        log "INFO" "Faucet service not found, skipping"
-        return 0
-    fi
-    
-    log "INFO" "Updating Faucet configuration (Port: $FAUCET_PORT)..."
-    
-    local template="server {
-    listen 443 ssl http2;
-    server_name faucet.testnet.attra.me;
-
-    ssl_certificate     /etc/letsencrypt/live/da.testnet.attra.me/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/da.testnet.attra.me/privkey.pem;
-
-    location / {
-        proxy_pass              http://127.0.0.1:$FAUCET_PORT;
-        proxy_set_header        Host               \$host;
-        proxy_set_header        X-Real-IP          \$remote_addr;
-        proxy_set_header        X-Forwarded-For    \$proxy_add_x_forwarded_for;
-        proxy_set_header        X-Forwarded-Proto  \$scheme;
-        proxy_http_version      1.1;
-    }
-}
-
-server {
-    listen 80;
-    server_name faucet.testnet.attra.me;
-
-    location /.well-known/acme-challenge/ {
-        root /var/www/certbot;
-    }
-
-    location / {
-        proxy_pass              http://127.0.0.1:$FAUCET_PORT;
-        proxy_set_header        Host               \$host;
-        proxy_set_header        X-Real-IP          \$remote_addr;
-        proxy_set_header        X-Forwarded-For    \$proxy_add_x_forwarded_for;
-        proxy_set_header        X-Forwarded-Proto  \$scheme;
-        proxy_http_version      1.1;
-    }
-}"
-
-    create_config "Faucet" "$config_file" "$template"
-}
-
 # Function to test nginx configuration
 test_nginx_config() {
     log "INFO" "Testing nginx configuration..."
     
-    if [[ "$DRY_RUN" == "true" ]]; then
-        log "INFO" "[DRY-RUN] Would check nginx configuration"
-        return 0
-    fi
+
     
     # Test nginx configuration using docker
     if docker exec attractor-nginx nginx -t >/dev/null 2>&1; then
@@ -508,10 +312,7 @@ test_nginx_config() {
 reload_nginx() {
     log "INFO" "Reloading nginx via docker compose..."
     
-    if [[ "$DRY_RUN" == "true" ]]; then
-        log "INFO" "[DRY-RUN] Would reload nginx via docker compose"
-        return 0
-    fi
+
     
     local docker_compose_dir="/opt/attractor"
     
@@ -532,17 +333,11 @@ reload_nginx() {
 
 # Function to restore from backup
 restore_from_backup() {
-    if [[ "$NO_BACKUP" == "true" ]]; then
-        log "ERROR" "Backup was not created (--no-backup), restore impossible"
-        return 1
-    fi
+
     
     log "WARNING" "Restoring configurations from backup..."
     
-    if [[ "$DRY_RUN" == "true" ]]; then
-        log "INFO" "[DRY-RUN] Would restore configurations from backup"
-        return 0
-    fi
+
     
     cp "$BACKUP_DIR"/*.conf "$NGINX_CONF_DIR/" 2>/dev/null || true
     cd "/opt/attractor" && docker compose up -d
@@ -553,12 +348,10 @@ restore_from_backup() {
 main() {
     log "INFO" "Starting nginx port update for enclave '$ENCLAVE_NAME'"
     
-    if [[ "$DRY_RUN" == "true" ]]; then
-        log "INFO" "DRY-RUN mode: changes will not be applied"
-    fi
+
     
     # Check root privileges
-    if [[ $EUID -ne 0 && "$DRY_RUN" == "false" ]]; then
+    if [[ $EUID -ne 0 ]]; then
         log "ERROR" "Root privileges required for nginx configuration changes"
         log "INFO" "Try: sudo $0 $*"
         exit 1
@@ -589,18 +382,6 @@ main() {
     fi
     
     if update_explorer_config; then
-        ((configs_updated++))
-    fi
-    
-    if update_bridge_config; then
-        ((configs_updated++))
-    fi
-    
-    if update_dac_config; then
-        ((configs_updated++))
-    fi
-    
-    if update_faucet_config; then
         ((configs_updated++))
     fi
     
