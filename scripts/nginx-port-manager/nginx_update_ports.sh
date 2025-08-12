@@ -33,6 +33,7 @@ log() {
         "SUCCESS")
             echo -e "${GREEN}$message${NC}"
             echo "$timestamp [SUCCESS] $message" >> "$LOG_FILE"
+            echo "DEBUG: log SUCCESS completed for: $message"
             ;;
         "WARNING")
             echo -e "${YELLOW}$message${NC}"
@@ -159,6 +160,7 @@ create_config() {
     mv "$config_file.tmp" "$config_file"
     echo "DEBUG: Config file created successfully"
     log "SUCCESS" "$service_name configuration updated"
+    echo "DEBUG: create_config function for $service_name completed"
 }
 
 # Function to update RPC configuration
@@ -228,6 +230,7 @@ server {
 }"
 
     create_config "RPC" "$config_file" "$template"
+    echo "DEBUG: update_rpc_config function completed successfully"
 }
 
 # Function to update Explorer configuration
@@ -391,10 +394,12 @@ main() {
     if update_rpc_config; then
         echo "DEBUG: RPC config updated successfully"
         ((configs_updated++))
+        echo "DEBUG: configs_updated incremented to $configs_updated"
     else
         echo "DEBUG: RPC config update failed"
     fi
     
+    echo "DEBUG: After RPC block, configs_updated=$configs_updated"
     echo "DEBUG: About to call update_explorer_config, configs_updated=$configs_updated"
     
     if update_explorer_config; then
