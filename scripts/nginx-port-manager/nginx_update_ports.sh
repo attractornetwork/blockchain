@@ -156,9 +156,12 @@ create_config() {
     
     echo "DEBUG: Creating config for $service_name in $config_file"
     
+    echo "DEBUG: Writing template to temp file"
     echo "$template" > "$config_file.tmp"
+    echo "DEBUG: Temp file created, moving to final location"
     mv "$config_file.tmp" "$config_file"
     echo "DEBUG: Config file created successfully"
+    echo "DEBUG: Calling log function for $service_name"
     log "SUCCESS" "$service_name configuration updated"
     echo "DEBUG: create_config function for $service_name completed"
 }
@@ -231,6 +234,8 @@ server {
 
     create_config "RPC" "$config_file" "$template"
     echo "DEBUG: update_rpc_config function completed successfully"
+    echo "DEBUG: update_rpc_config returning 0 (success)"
+    return 0
 }
 
 # Function to update Explorer configuration
@@ -391,8 +396,10 @@ main() {
     
     echo "DEBUG: Starting configuration updates..."
     
+    echo "DEBUG: Before calling update_rpc_config"
     if update_rpc_config; then
         echo "DEBUG: RPC config updated successfully"
+        echo "DEBUG: Before incrementing configs_updated, current value: $configs_updated"
         ((configs_updated++))
         echo "DEBUG: configs_updated incremented to $configs_updated"
     else
