@@ -235,7 +235,7 @@ server {
     ssl_certificate_key /etc/letsencrypt/live/da.testnet.attra.me/privkey.pem;
 
     location / {
-        proxy_pass              http://$EXPLORER_FRONTEND_PORT\$request_uri;
+        proxy_pass              http://127.0.0.1:\$explorer_backend_port\$request_uri;
         proxy_set_header        Host               \$host;
         proxy_set_header        X-Real-IP          \$remote_addr;
         proxy_set_header        X-Forwarded-For    \$proxy_add_x_forwarded_for;
@@ -255,7 +255,7 @@ server {
     }
 
     location / {
-        proxy_pass              http://$EXPLORER_FRONTEND_PORT\$request_uri;
+        proxy_pass              http://127.0.0.1:\$explorer_backend_port\$request_uri;
         proxy_set_header        Host               \$host;
         proxy_set_header        X-Real-IP          \$remote_addr;
         proxy_set_header        X-Forwarded-For    \$proxy_add_x_forwarded_for;
