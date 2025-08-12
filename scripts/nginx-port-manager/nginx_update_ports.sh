@@ -142,6 +142,9 @@ extract_ports() {
     echo "  Explorer Frontend: ${EXPLORER_FRONTEND_PORT:-not found}"
     echo "  Explorer API: ${EXPLORER_API_PORT:-not found}"
     echo "  Explorer Stats: ${EXPLORER_STATS_PORT:-not found}"
+    
+    # Return success
+    return 0
 }
 
 # Function to create configuration
@@ -150,10 +153,11 @@ create_config() {
     local config_file="$2"
     local template="$3"
     
-
+    echo "DEBUG: Creating config for $service_name in $config_file"
     
     echo "$template" > "$config_file.tmp"
     mv "$config_file.tmp" "$config_file"
+    echo "DEBUG: Config file created successfully"
     log "SUCCESS" "$service_name configuration updated"
 }
 
@@ -228,7 +232,10 @@ server {
 
 # Function to update Explorer configuration
 update_explorer_config() {
+    echo "DEBUG: Entering update_explorer_config function"
     local config_file="$NGINX_CONF_DIR/explorer.testnet.attra.me.conf"
+    
+    echo "DEBUG: Checking Explorer ports: FRONTEND=$EXPLORER_FRONTEND_PORT, API=$EXPLORER_API_PORT, STATS=$EXPLORER_STATS_PORT"
     
     if [[ -z "$EXPLORER_FRONTEND_PORT" || -z "$EXPLORER_API_PORT" || -z "$EXPLORER_STATS_PORT" ]]; then
         log "ERROR" "Failed to find ports for Explorer service"
@@ -236,6 +243,8 @@ update_explorer_config() {
     fi
     
     log "INFO" "Updating Explorer configuration (Frontend: $EXPLORER_FRONTEND_PORT, API: $EXPLORER_API_PORT, Stats: $EXPLORER_STATS_PORT)..."
+    
+    echo "DEBUG: Creating Explorer template with ports: FRONTEND=$EXPLORER_FRONTEND_PORT, API=$EXPLORER_API_PORT, STATS=$EXPLORER_STATS_PORT, SOCKET=$EXPLORER_SOCKET_PORT"
     
     local template="map \$request_uri \$explorer_backend_port {
     ~^/api/            $EXPLORER_API_PORT;
@@ -377,13 +386,25 @@ main() {
     # Update configurations
     local configs_updated=0
     
+    echo "DEBUG: Starting configuration updates..."
+    
     if update_rpc_config; then
+        echo "DEBUG: RPC config updated successfully"
         ((configs_updated++))
+    else
+        echo "DEBUG: RPC config update failed"
     fi
     
+    echo "DEBUG: About to call update_explorer_config, configs_updated=$configs_updated"
+    
     if update_explorer_config; then
+        echo "DEBUG: Explorer config updated successfully"
         ((configs_updated++))
+    else
+        echo "DEBUG: Explorer config update failed"
     fi
+    
+    echo "DEBUG: After all config updates, configs_updated=$configs_updated"
     
     if [[ $configs_updated -eq 0 ]]; then
         log "WARNING" "No configurations were updated"
