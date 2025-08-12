@@ -11,39 +11,9 @@ NGINX_CONF_DIR="${NGINX_CONF_DIR:-/opt/attractor/nginx/conf.d}"
 BACKUP_DIR="${BACKUP_DIR:-/opt/attractor/nginx/conf.d/backup}"
 LOG_FILE="${LOG_FILE:-/var/log/nginx-port-updater.log}"
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
-
-# Logging function
+# Simple logging
 log() {
-    local level="$1"
-    shift
-    local message="$*"
-    local timestamp="[$(date '+%Y-%m-%d %H:%M:%S')]"
-    
-    case "$level" in
-        "INFO")
-            echo -e "${BLUE}$message${NC}"
-            echo "$timestamp [INFO] $message" >> "$LOG_FILE"
-            ;;
-        "SUCCESS")
-            echo -e "${GREEN}$message${NC}"
-            echo "$timestamp [SUCCESS] $message" >> "$LOG_FILE"
-            echo "DEBUG: log SUCCESS completed for: $message"
-            ;;
-        "WARNING")
-            echo -e "${YELLOW}$message${NC}"
-            echo "$timestamp [WARNING] $message" >> "$LOG_FILE"
-            ;;
-        "ERROR")
-            echo -e "${RED}$message${NC}"
-            echo "$timestamp [ERROR] $message" >> "$LOG_FILE"
-            ;;
-    esac
+    echo "$*"
 }
 
 # Show help
@@ -93,16 +63,12 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Function to create config backup
-backup_configs() {
-
-    
-    log "INFO" "Creating nginx configuration backup..."
-    
-
+backup_configs() {    
+    log "Creating nginx configuration backup..."
     
     mkdir -p "$BACKUP_DIR"
     cp "$NGINX_CONF_DIR"/*.conf "$BACKUP_DIR/" 2>/dev/null || true
-    log "SUCCESS" "Backup created in $BACKUP_DIR"
+    log "Backup created in $BACKUP_DIR"
 }
 
 # Function to get ports from Kurtosis
@@ -124,7 +90,7 @@ get_service_ports() {
 
 # Function to extract all ports
 extract_ports() {
-    log "INFO" "Extracting ports from enclave '$ENCLAVE_NAME'..."
+    log "Extracting ports from enclave '$ENCLAVE_NAME'..."
     
     # RPC service (cdk-erigon-sequencer)
     RPC_HTTP_PORT=$(get_service_ports "cdk-erigon-sequencer" "rpc")
@@ -137,14 +103,13 @@ extract_ports() {
     EXPLORER_SOCKET_PORT="$RPC_WS_PORT"  # Use same WS port
     
     # Show found ports
-    log "SUCCESS" "Found ports:"
+    log "Found ports:"
     echo "  RPC HTTP: ${RPC_HTTP_PORT:-not found}"
     echo "  RPC WebSocket: ${RPC_WS_PORT:-not found}"
     echo "  Explorer Frontend: ${EXPLORER_FRONTEND_PORT:-not found}"
     echo "  Explorer API: ${EXPLORER_API_PORT:-not found}"
     echo "  Explorer Stats: ${EXPLORER_STATS_PORT:-not found}"
     
-    # Return success
     return 0
 }
 
@@ -154,16 +119,9 @@ create_config() {
     local config_file="$2"
     local template="$3"
     
-    echo "DEBUG: Creating config for $service_name in $config_file"
-    
-    echo "DEBUG: Writing template to temp file"
     echo "$template" > "$config_file.tmp"
-    echo "DEBUG: Temp file created, moving to final location"
     mv "$config_file.tmp" "$config_file"
-    echo "DEBUG: Config file created successfully"
-    echo "DEBUG: Calling log function for $service_name"
-    log "SUCCESS" "$service_name configuration updated"
-    echo "DEBUG: create_config function for $service_name completed"
+    log "$service_name configuration updated"
 }
 
 # Function to update RPC configuration
@@ -171,11 +129,11 @@ update_rpc_config() {
     local config_file="$NGINX_CONF_DIR/rpc.testnet.attra.me.conf"
     
     if [[ -z "$RPC_HTTP_PORT" || -z "$RPC_WS_PORT" ]]; then
-        log "ERROR" "Failed to find ports for RPC service"
+        log "ERROR: Failed to find ports for RPC service"
         return 1
     fi
     
-    log "INFO" "Updating RPC configuration (HTTP: $RPC_HTTP_PORT, WS: $RPC_WS_PORT)..."
+    log "Updating RPC configuration (HTTP: $RPC_HTTP_PORT, WS: $RPC_WS_PORT)..."
     
     local template="map \$http_upgrade \$connection_upgrade {
     default   Upgrade;
@@ -233,26 +191,19 @@ server {
 }"
 
     create_config "RPC" "$config_file" "$template"
-    echo "DEBUG: update_rpc_config function completed successfully"
-    echo "DEBUG: update_rpc_config returning 0 (success)"
     return 0
 }
 
 # Function to update Explorer configuration
 update_explorer_config() {
-    echo "DEBUG: Entering update_explorer_config function"
     local config_file="$NGINX_CONF_DIR/explorer.testnet.attra.me.conf"
     
-    echo "DEBUG: Checking Explorer ports: FRONTEND=$EXPLORER_FRONTEND_PORT, API=$EXPLORER_API_PORT, STATS=$EXPLORER_STATS_PORT"
-    
     if [[ -z "$EXPLORER_FRONTEND_PORT" || -z "$EXPLORER_API_PORT" || -z "$EXPLORER_STATS_PORT" ]]; then
-        log "ERROR" "Failed to find ports for Explorer service"
+        log "ERROR: Failed to find ports for Explorer service"
         return 1
     fi
     
-    log "INFO" "Updating Explorer configuration (Frontend: $EXPLORER_FRONTEND_PORT, API: $EXPLORER_API_PORT, Stats: $EXPLORER_STATS_PORT)..."
-    
-    echo "DEBUG: Creating Explorer template with ports: FRONTEND=$EXPLORER_FRONTEND_PORT, API=$EXPLORER_API_PORT, STATS=$EXPLORER_STATS_PORT, SOCKET=$EXPLORER_SOCKET_PORT"
+    log "Updating Explorer configuration (Frontend: $EXPLORER_FRONTEND_PORT, API: $EXPLORER_API_PORT, Stats: $EXPLORER_STATS_PORT)..."
     
     local template="map \$request_uri \$explorer_backend_port {
     ~^/api/            $EXPLORER_API_PORT;
@@ -310,16 +261,14 @@ server {
 
 # Function to test nginx configuration
 test_nginx_config() {
-    log "INFO" "Testing nginx configuration..."
-    
-
+    log "Testing nginx configuration..."
     
     # Test nginx configuration using docker
     if docker exec attractor-nginx nginx -t >/dev/null 2>&1; then
-        log "SUCCESS" "Nginx configuration is valid"
+        log "Nginx configuration is valid"
         return 0
     else
-        log "ERROR" "Nginx configuration contains errors:"
+        log "ERROR: Nginx configuration contains errors:"
         docker exec attractor-nginx nginx -t
         return 1
     fi
@@ -363,7 +312,7 @@ restore_from_backup() {
 
 # Main function
 main() {
-    log "INFO" "Starting nginx port update for enclave '$ENCLAVE_NAME'"
+    log "Starting nginx port update for enclave '$ENCLAVE_NAME'"
     
 
     
@@ -392,29 +341,19 @@ main() {
     extract_ports
     
     # Update configurations
-    echo "DEBUG: Starting configuration updates..."
-    
-    # Update RPC configuration
-    echo "DEBUG: Updating RPC configuration..."
     if update_rpc_config; then
-        echo "DEBUG: RPC config updated successfully"
+        log "RPC configuration updated"
     else
-        echo "DEBUG: RPC config update failed"
-        log "ERROR" "Failed to update RPC configuration"
+        log "ERROR: Failed to update RPC configuration"
         exit 1
     fi
     
-    # Update Explorer configuration
-    echo "DEBUG: Updating Explorer configuration..."
     if update_explorer_config; then
-        echo "DEBUG: Explorer config updated successfully"
+        log "Explorer configuration updated"
     else
-        echo "DEBUG: Explorer config update failed"
-        log "ERROR" "Failed to update Explorer configuration"
+        log "ERROR: Failed to update Explorer configuration"
         exit 1
     fi
-    
-    echo "DEBUG: All config updates completed successfully"
     
     # Check configuration
     if test_nginx_config; then

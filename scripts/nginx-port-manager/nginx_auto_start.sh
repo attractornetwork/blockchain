@@ -11,34 +11,9 @@ SERVICE_NAME="nginx-port-updater"
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/nginx_update_ports.sh"
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
-
-# Logging function
+# Simple logging
 log() {
-    local level="$1"
-    shift
-    local message="$*"
-    local timestamp="[$(date '+%Y-%m-%d %H:%M:%S')]"
-    
-    case "$level" in
-        "INFO")
-            echo -e "${BLUE}$message${NC}"
-            ;;
-        "SUCCESS")
-            echo -e "${GREEN}$message${NC}"
-            ;;
-        "WARNING")
-            echo -e "${YELLOW}$message${NC}"
-            ;;
-        "ERROR")
-            echo -e "${RED}$message${NC}"
-            ;;
-    esac
+    echo "$*"
 }
 
 # Show help
@@ -77,7 +52,7 @@ check_root() {
 
 # Create systemd service file
 create_service() {
-    log "INFO" "Creating systemd service for enclave '$ENCLAVE_NAME'..."
+    log "Creating systemd service for enclave '$ENCLAVE_NAME'..."
     
     cat > "$SERVICE_FILE" << EOF
 [Unit]
@@ -98,38 +73,38 @@ StandardError=journal
 WantedBy=multi-user.target
 EOF
 
-    log "SUCCESS" "Service file created: $SERVICE_FILE"
+    log "Service file created: $SERVICE_FILE"
 }
 
 # Enable and start service
 enable_service() {
-    log "INFO" "Enabling and starting service..."
+    log "Enabling and starting service..."
     
     # Reload systemd
     systemctl daemon-reload
     
     # Enable service (start on boot)
     if systemctl enable "$SERVICE_NAME"; then
-        log "SUCCESS" "Service enabled for boot startup"
+        log "Service enabled for boot startup"
     else
-        log "ERROR" "Failed to enable service"
+        log "ERROR: Failed to enable service"
         return 1
     fi
     
     # Start service now (optional)
     if systemctl start "$SERVICE_NAME"; then
-        log "SUCCESS" "Service started successfully"
+        log "Service started successfully"
     else
-        log "WARNING" "Service started but may have failed (check logs)"
+        log "WARNING: Service started but may have failed (check logs)"
     fi
 }
 
 # Show status
 show_status() {
-    log "INFO" "Service status:"
+    log "Service status:"
     systemctl status "$SERVICE_NAME" --no-pager -l || true
     
-    log "INFO" "Service enabled status:"
+    log "Service enabled status:"
     systemctl is-enabled "$SERVICE_NAME" || echo "Not enabled"
 }
 
@@ -146,14 +121,14 @@ main() {
     
     # Check if script exists
     if [[ ! -f "$SCRIPT_PATH" ]]; then
-        log "ERROR" "Script not found: $SCRIPT_PATH"
+        log "ERROR: Script not found: $SCRIPT_PATH"
         exit 1
     fi
     
     # Make script executable
     chmod +x "$SCRIPT_PATH"
     
-    log "INFO" "Setting up automatic nginx port updates for enclave '$ENCLAVE_NAME'"
+    log "Setting up automatic nginx port updates for enclave '$ENCLAVE_NAME'"
     
     # Create service
     create_service
@@ -164,9 +139,9 @@ main() {
     # Show status
     show_status
     
-    log "SUCCESS" "Automatic nginx port updates enabled!"
-    log "INFO" "Service will run automatically on next system boot"
-    log "INFO" "To disable: sudo ./nginx_auto_stop.sh"
+    log "Automatic nginx port updates enabled!"
+    log "Service will run automatically on next system boot"
+    log "To disable: sudo ./nginx_auto_stop.sh"
 }
 
 # Run script
