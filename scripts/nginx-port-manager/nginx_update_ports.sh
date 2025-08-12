@@ -73,15 +73,27 @@ backup_configs() {
 
 # Function to get ports from Docker containers
 get_service_ports() {
-    local service_name="$1"
+    local container_prefix="$1"
     local internal_port="$2"
     
-    # Extract external port from docker ps output
+    # First try to find external port mapping (0.0.0.0:EXTERNAL->INTERNAL)
     local port=$(docker ps --format "table {{.Names}}\t{{.Ports}}" | \
-        grep "$service_name" | \
+        grep "^$container_prefix" | \
         grep -o "0\.0\.0\.0:\([0-9]\+\)->$internal_port" | \
         cut -d: -f2 | \
         cut -d- -f1)
+    
+    # If no external port found, check if container has internal port without external mapping
+    if [[ -z "$port" ]]; then
+        local has_internal_port=$(docker ps --format "table {{.Names}}\t{{.Ports}}" | \
+            grep "^$container_prefix" | \
+            grep -q "$internal_port/tcp")
+        
+        if [[ $? -eq 0 ]]; then
+            # Container has internal port, use localhost
+            port="$internal_port"
+        fi
+    fi
     
     echo "$port"
 }
@@ -223,7 +235,7 @@ server {
     ssl_certificate_key /etc/letsencrypt/live/da.testnet.attra.me/privkey.pem;
 
     location / {
-        proxy_pass              http://127.0.0.1:\$explorer_backend_port\$request_uri;
+        proxy_pass              http://$EXPLORER_FRONTEND_PORT\$request_uri;
         proxy_set_header        Host               \$host;
         proxy_set_header        X-Real-IP          \$remote_addr;
         proxy_set_header        X-Forwarded-For    \$proxy_add_x_forwarded_for;
@@ -243,7 +255,7 @@ server {
     }
 
     location / {
-        proxy_pass              http://127.0.0.1:\$explorer_backend_port\$request_uri;
+        proxy_pass              http://$EXPLORER_FRONTEND_PORT\$request_uri;
         proxy_set_header        Host               \$host;
         proxy_set_header        X-Real-IP          \$remote_addr;
         proxy_set_header        X-Forwarded-For    \$proxy_add_x_forwarded_for;
