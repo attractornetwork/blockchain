@@ -304,9 +304,7 @@ test_nginx_config() {
 
 # Function to reload nginx via docker compose
 reload_nginx() {
-    log "INFO" "Reloading nginx via docker compose..."
-    
-
+    log "Reloading nginx via docker compose..."
     
     local docker_compose_dir="/opt/attractor"
     
@@ -316,11 +314,18 @@ reload_nginx() {
     fi
     
     cd "$docker_compose_dir"
+    
+    # Принудительно остановить и удалить контейнеры
+    log "Stopping and removing containers..."
+    docker compose down
+    
+    # Поднять контейнеры заново
+    log "Starting containers with new configuration..."
     if docker compose up -d; then
-        log "SUCCESS" "Nginx reloaded successfully via docker compose"
+        log "SUCCESS" "Nginx containers restarted successfully with new configuration"
         return 0
     else
-        log "ERROR" "Failed to reload nginx via docker compose"
+        log "ERROR" "Failed to restart nginx containers"
         return 1
     fi
 }
