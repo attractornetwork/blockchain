@@ -91,18 +91,18 @@ extract_ports() {
     log "Extracting ports from docker containers..."
     
     # RPC service (cdk-erigon-sequencer)
-    RPC_HTTP_PORT=$(get_service_ports "cdk-erigon-sequencer" "6060")
-    RPC_WS_PORT=$(get_service_ports "cdk-erigon-sequencer" "6900")
+    RPC_HTTP_PORT=$(get_service_ports "cdk-erigon-sequencer" "8123")
+    RPC_WS_PORT=$(get_service_ports "cdk-erigon-sequencer" "8133")
     
     # Explorer services
     EXPLORER_FRONTEND_PORT=$(get_service_ports "bs-frontend" "3000")
-    EXPLORER_API_PORT=$(get_service_ports "bs-backend" "50102")
+    EXPLORER_API_PORT=$(get_service_ports "bs-backend" "4004")
     EXPLORER_STATS_PORT=$(get_service_ports "bs-stats" "8050")
     EXPLORER_SOCKET_PORT="$RPC_WS_PORT"  # Use same WS port
     
     # Show found ports
     log "Found ports:"
-    echo "  RPC HTTP: ${RPC_HTTP_PORT:-not found}"
+    echo "  RPC HTTP: ${RPC_HTTP_PORT:-not found}" 
     echo "  RPC WebSocket: ${RPC_WS_PORT:-not found}"
     echo "  Explorer Frontend: ${EXPLORER_FRONTEND_PORT:-not found}"
     echo "  Explorer API: ${EXPLORER_API_PORT:-not found}"
