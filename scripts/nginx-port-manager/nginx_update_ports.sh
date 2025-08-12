@@ -392,42 +392,35 @@ main() {
     extract_ports
     
     # Update configurations
-    local configs_updated=0
-    
     echo "DEBUG: Starting configuration updates..."
     
-    echo "DEBUG: Before calling update_rpc_config"
+    # Update RPC configuration
+    echo "DEBUG: Updating RPC configuration..."
     if update_rpc_config; then
         echo "DEBUG: RPC config updated successfully"
-        echo "DEBUG: Before incrementing configs_updated, current value: $configs_updated"
-        ((configs_updated++))
-        echo "DEBUG: configs_updated incremented to $configs_updated"
     else
         echo "DEBUG: RPC config update failed"
-    fi
-    
-    echo "DEBUG: After RPC block, configs_updated=$configs_updated"
-    echo "DEBUG: About to call update_explorer_config, configs_updated=$configs_updated"
-    
-    if update_explorer_config; then
-        echo "DEBUG: Explorer config updated successfully"
-        ((configs_updated++))
-    else
-        echo "DEBUG: Explorer config update failed"
-    fi
-    
-    echo "DEBUG: After all config updates, configs_updated=$configs_updated"
-    
-    if [[ $configs_updated -eq 0 ]]; then
-        log "WARNING" "No configurations were updated"
+        log "ERROR" "Failed to update RPC configuration"
         exit 1
     fi
+    
+    # Update Explorer configuration
+    echo "DEBUG: Updating Explorer configuration..."
+    if update_explorer_config; then
+        echo "DEBUG: Explorer config updated successfully"
+    else
+        echo "DEBUG: Explorer config update failed"
+        log "ERROR" "Failed to update Explorer configuration"
+        exit 1
+    fi
+    
+    echo "DEBUG: All config updates completed successfully"
     
     # Check configuration
     if test_nginx_config; then
         # Reload nginx
         if reload_nginx; then
-            log "SUCCESS" "Port update completed successfully! Updated configurations: $configs_updated"
+            log "SUCCESS" "Port update completed successfully!"
         else
             restore_from_backup
             exit 1
