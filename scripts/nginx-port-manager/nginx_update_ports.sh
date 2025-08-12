@@ -71,6 +71,21 @@ backup_configs() {
     log "Backup created in $BACKUP_DIR"
 }
 
+# Function to get any external port from a container by name
+get_container_port() {
+    local container_name="$1"
+    
+    # Get the first available external port from the container
+    local port=$(docker ps --format "table {{.Names}}\t{{.Ports}}" | \
+        grep "^$container_name" | \
+        grep -o "0\.0\.0\.0:\([0-9]\+\)->[0-9]\+" | \
+        cut -d: -f2 | \
+        cut -d- -f1 | \
+        head -1)
+    
+    echo "$port"
+}
+
 # Function to get ports from Docker containers
 get_service_ports() {
     local container_prefix="$1"
@@ -111,7 +126,7 @@ extract_ports() {
     # Explorer services
     log "Searching for Explorer ports..."
     EXPLORER_FRONTEND_PORT=$(get_service_ports "bs-frontend" "3000")
-    EXPLORER_API_PORT=$(get_service_ports "bs-backend" "4004")
+    EXPLORER_API_PORT=$(get_container_port "bs-backend")
     EXPLORER_STATS_PORT=$(get_service_ports "bs-stats" "8050")
     EXPLORER_SOCKET_PORT="$RPC_WS_PORT"  # Use same WS port
     
