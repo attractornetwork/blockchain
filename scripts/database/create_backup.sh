@@ -24,35 +24,53 @@ echo "Enclave: $ENCLAVE_NAME"
 echo "Backup directory: $BACKUP_DIR"
 echo ""
 
-# Check if enclave exists by looking for containers with enclave pattern
-if ! docker ps -a --format "table {{.Names}}" | grep -q "${ENCLAVE_NAME}--"; then
+# Check if environment prefix exists by checking containers that start with it
+# Example: for ENCLAVE_NAME="cdk" match names like "cdk-erigon-rpc-001--<uuid>"
+if ! docker ps -a --format '{{.Names}}' | grep -q -E -- "^${ENCLAVE_NAME}-"; then
     echo "ERROR: Enclave '$ENCLAVE_NAME' not found!"
-    echo "Available enclaves (by container names):"
-    docker ps -a --format "table {{.Names}}" | grep -E "--[a-f0-9]{32}$" | sed 's/--[a-f0-9]\{32\}$//' | sort -u
+    echo "Available environments (by container prefixes):"
+    docker ps -a --format '{{.Names}}' \
+      | sed 's/--[a-f0-9]\{32\}$//' \
+      | awk -F '-' '{print $1}' \
+      | sort -u
     exit 1
 fi
 
 # Function to check if service exists using Docker
 service_exists() {
     local service=$1
-    # Look for container with service name pattern in the enclave
-    local container_pattern="${service}--"
-    docker ps -a --format "table {{.Names}}" | grep -q "$container_pattern"
+    local id
+    id=$(get_container_id "$service")
+    [ -n "$id" ]
 }
 
 # Function to check if service is running using Docker
 service_is_running() {
     local service=$1
-    # Look for running container with service name pattern in the enclave
-    local container_pattern="${service}--"
-    docker ps --format "table {{.Names}}" | grep -q "$container_pattern"
+    local id
+    id=$(get_container_id "$service")
+    if [ -z "$id" ]; then
+        return 1
+    fi
+    docker ps --format '{{.ID}}' | awk -v target="$id" '$0==target { found=1 } END{ exit found?0:1 }'
 }
 
 # Function to get container ID for a service
 get_container_id() {
     local service=$1
-    local container_pattern="${service}--"
-    docker ps -a --format "table {{.ID}}\t{{.Names}}" | grep "$container_pattern" | awk '{print $1}' | head -n1
+    docker ps -a --format '{{.Names}}\t{{.ID}}' \
+      | awk -v svc="$service" -F '\t' '
+          $1==svc || $1 ~ ("^"svc"--[a-f0-9]{32}$") || \
+          $1 ~ ("^"ENVIRON["ENCLAVE_NAME"]"-.*"svc"(--[a-f0-9]{32})?$") {print $2; exit}
+        '
+}
+
+# Find actual service name (returns first match) given a short name
+find_service_name() {
+    local short=$1
+    docker ps -a --format '{{.Names}}' \
+      | grep -E -- "(^${ENCLAVE_NAME}-.*${short}(--[a-f0-9]{32})?$)|(^${short}(--[a-f0-9]{32})?$)" \
+      | head -n1
 }
 
 # Prepare backup directory (clean if exists, else create)
@@ -72,22 +90,21 @@ else
 fi
 
 # Check if postgres service exists for backup
-POSTGRES_SERVICE="postgres-001"
-if ! service_exists "$POSTGRES_SERVICE"; then
-    echo "ERROR: Postgres service '$POSTGRES_SERVICE' not found in enclave '$ENCLAVE_NAME'!"
-    echo "Available services:"
-    docker ps -a --format "table {{.Names}}" | grep "${ENCLAVE_NAME}--" | sed 's/--[a-f0-9]\{32\}$//' | sort -u
-    exit 1
+POSTGRES_SERVICE=$(find_service_name "postgres-001")
+if [ -z "$POSTGRES_SERVICE" ]; then
+    echo "⚠️  Postgres service '$POSTGRES_SERVICE' not found in enclave '$ENCLAVE_NAME'"
+    echo "    Skipping database backups and proceeding with blockchain data backup only."
+    POSTGRES_SERVICE=""
+else
+    echo "✅ Postgres service found"
 fi
-
-echo "✅ Postgres service found"
 
 # Show current enclave status
 echo ""
 echo "=== Current enclave status ==="
 echo "Enclave: $ENCLAVE_NAME"
 echo "Containers:"
-docker ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" | grep "${ENCLAVE_NAME}--"
+docker ps -a --format '{{.Names}}\t{{.Status}}\t{{.Ports}}' | grep -E -- "^${ENCLAVE_NAME}-"
 
 echo ""
 echo "=== CREATING DATABASE BACKUPS ==="
@@ -106,7 +123,9 @@ declare -A DATABASES=(
 
 BACKUP_SUCCESS=true
 BACKUP_COUNT=0
+BC_BACKUP_SUCCESS=false
 
+if [ -n "$POSTGRES_SERVICE" ]; then
 for db_name in "${!DATABASES[@]}"; do
     db_user="${DATABASES[$db_name]}"
     backup_file="${db_name}_backup.sql"
@@ -114,7 +133,7 @@ for db_name in "${!DATABASES[@]}"; do
     echo "Backing up $db_name database..."
 
     # Get container ID for postgres service
-    local container_id=$(get_container_id "$POSTGRES_SERVICE")
+    container_id=$(get_container_id "$POSTGRES_SERVICE")
     if [ -z "$container_id" ]; then
         echo "❌ Could not find container for $POSTGRES_SERVICE"
         continue
@@ -125,7 +144,7 @@ for db_name in "${!DATABASES[@]}"; do
         echo "✅ Successfully backed up $db_name"
 
         # Check if the backup file was created and has content
-        file_size=$(docker exec "$container_id" bash -c "ls -lh /tmp/$backup_file 2>/dev/null | awk '{print \$5}' || echo '0'")
+        file_size=$(docker exec "$container_id" bash -lc "ls -lh /tmp/$backup_file 2>/dev/null | awk '{print \$5}' || echo '0'")
         if [ "$file_size" != "0" ] && [ "$file_size" != "" ]; then
             echo "✅ Backup file size: $file_size"
         else
@@ -134,11 +153,11 @@ for db_name in "${!DATABASES[@]}"; do
 
         # Download the backup file via base64 stream into the specified backup directory
         echo "Downloading $backup_file from container via base64..."
-        if docker exec "$container_id" bash -c "base64 /tmp/$backup_file" > "$BACKUP_DIR/$backup_file.b64"; then
+        if docker exec "$container_id" bash -lc "base64 /tmp/$backup_file" > "$BACKUP_DIR/$backup_file.b64"; then
             if base64 -d "$BACKUP_DIR/$backup_file.b64" > "$BACKUP_DIR/$backup_file"; then
                 rm -f "$BACKUP_DIR/$backup_file.b64"
-                file_size=$(du -h "$BACKUP_DIR/$backup_file" | cut -f1)
-                echo "✅ Downloaded $backup_file to $BACKUP_DIR ($file_size)"
+                file_bytes=$(wc -c < "$BACKUP_DIR/$backup_file" | tr -d '[:space:]')
+                echo "✅ Downloaded $backup_file to $BACKUP_DIR (${file_bytes} bytes)"
                 BACKUP_COUNT=$((BACKUP_COUNT + 1))
             else
                 echo "❌ Failed to decode $backup_file from base64"
@@ -150,11 +169,14 @@ for db_name in "${!DATABASES[@]}"; do
         fi
 
         # Clean up the file from container
-        docker exec "$container_id" bash -c "rm -f /tmp/$backup_file"
+        docker exec "$container_id" bash -lc "rm -f /tmp/$backup_file"
     else
         echo "⚠️  Could not backup $db_name database (database might not exist or be empty)"
     fi
 done
+else
+  echo "Skipping database backups because postgres service is not available."
+fi
 
 echo ""
 echo "=== BACKING UP BLOCKCHAIN DATA (ERIGON) ==="
@@ -180,21 +202,22 @@ backup_erigon_datadir() {
 
     if service_is_running "$service_name"; then
         # Online archive without stopping the service
-        if docker exec "$container_id" bash -c "tar -czf /tmp/${out_file_name}.tar.gz -C /home/erigon/data dynamic-Attractor-sequencer"; then
+        if docker exec "$container_id" sh -lc "tar -czf /tmp/${out_file_name}.tar.gz -C /home/erigon/data dynamic-Attractor-sequencer 2>/dev/null || tar -czf /tmp/${out_file_name}.tar.gz -C /home/erigon/data datadir 2>/dev/null"; then
             echo "✅ Blockchain data archive created for $service_name"
-            docker exec "$container_id" bash -c "ls -lh /tmp/${out_file_name}.tar.gz"
+            docker exec "$container_id" sh -lc "ls -lh /tmp/${out_file_name}.tar.gz"
 
             # Download archive via base64 stream into the specified backup directory
             echo "Downloading archive via base64 transfer..."
-            if docker exec "$container_id" bash -c "base64 /tmp/${out_file_name}.tar.gz" > "$BACKUP_DIR/${out_file_name}.tar.gz.b64"; then
+            if docker exec "$container_id" sh -lc "base64 /tmp/${out_file_name}.tar.gz" > "$BACKUP_DIR/${out_file_name}.tar.gz.b64"; then
                 if base64 -d "$BACKUP_DIR/${out_file_name}.tar.gz.b64" > "$BACKUP_DIR/${out_file_name}.tar.gz"; then
                     rm -f "$BACKUP_DIR/${out_file_name}.tar.gz.b64"
                     echo "✅ Archive saved: $BACKUP_DIR/${out_file_name}.tar.gz"
+                    BC_BACKUP_SUCCESS=true
                 else
                     echo "❌ Failed to decode archive: $BACKUP_DIR/${out_file_name}.tar.gz.b64"
                 fi
                 # Clean up the file from container
-                docker exec "$container_id" bash -c "rm -f /tmp/${out_file_name}.tar.gz" || true
+                docker exec "$container_id" sh -lc "rm -f /tmp/${out_file_name}.tar.gz" || true
             else
                 echo "❌ Failed to transfer archive via base64 for ${out_file_name}.tar.gz"
             fi
@@ -212,7 +235,7 @@ backup_erigon_datadir() {
         echo "Copying datadir from container $container_id..."
         if docker cp "$container_id:/home/erigon/data/dynamic-Attractor-sequencer" "$TMP_DIR/"; then
             echo "Creating archive..."
-            tar -czf "$BACKUP_DIR/${out_file_name}.tar.gz" -C "$TMP_DIR" dynamic-Attractor-sequencer && echo "✅ Archive saved: $BACKUP_DIR/${out_file_name}.tar.gz"
+            tar -czf "$BACKUP_DIR/${out_file_name}.tar.gz" -C "$TMP_DIR" dynamic-Attractor-sequencer && echo "✅ Archive saved: $BACKUP_DIR/${out_file_name}.tar.gz" && BC_BACKUP_SUCCESS=true
         else
             echo "❌ Failed to copy datadir from container"
         fi
@@ -221,11 +244,11 @@ backup_erigon_datadir() {
 }
 
 # Бэкап sequencer
-ERIGON_SEQUENCER="cdk-erigon-sequencer-001"
+ERIGON_SEQUENCER="${ENCLAVE_NAME}-erigon-sequencer-001"
 backup_erigon_datadir "$ERIGON_SEQUENCER" "blockchain_data_backup_sequencer"
 
 # Бэкап rpc-ноды (ускоряет восстановление и проверку транзакций)
-ERIGON_RPC="cdk-erigon-rpc-001"
+ERIGON_RPC="${ENCLAVE_NAME}-erigon-rpc-001"
 backup_erigon_datadir "$ERIGON_RPC" "blockchain_data_backup_rpc"
 
 echo ""
@@ -233,7 +256,7 @@ echo "=== BACKUP SUMMARY ==="
 echo "Backup directory: $BACKUP_DIR"
 echo "Successfully backed up: $BACKUP_COUNT database(s)"
 
-if [ "$BACKUP_SUCCESS" = true ] && [ $BACKUP_COUNT -gt 0 ]; then
+if [ "$BACKUP_SUCCESS" = true ] && { [ $BACKUP_COUNT -gt 0 ] || [ "$BC_BACKUP_SUCCESS" = true ]; }; then
     echo "✅ Backup completed successfully!"
 
     echo ""
@@ -245,8 +268,8 @@ if [ "$BACKUP_SUCCESS" = true ] && [ $BACKUP_COUNT -gt 0 ]; then
     echo "You can verify the backup by checking file sizes:"
     for file in "$BACKUP_DIR"/*.sql; do
         if [ -f "$file" ]; then
-            size=$(du -h "$file" | cut -f1)
-            echo "  $(basename "$file"): $size"
+            size_bytes=$(wc -c < "$file" | tr -d '[:space:]')
+            echo "  $(basename "$file"): ${size_bytes} bytes"
         fi
     done
 
