@@ -24,24 +24,35 @@ echo "Enclave: $ENCLAVE_NAME"
 echo "Backup directory: $BACKUP_DIR"
 echo ""
 
-# Check if enclave exists
-if ! kurtosis enclave ls | grep -q "$ENCLAVE_NAME"; then
+# Check if enclave exists by looking for containers with enclave pattern
+if ! docker ps -a --format "table {{.Names}}" | grep -q "${ENCLAVE_NAME}--"; then
     echo "ERROR: Enclave '$ENCLAVE_NAME' not found!"
-    echo "Available enclaves:"
-    kurtosis enclave ls
+    echo "Available enclaves (by container names):"
+    docker ps -a --format "table {{.Names}}" | grep -E "--[a-f0-9]{32}$" | sed 's/--[a-f0-9]\{32\}$//' | sort -u
     exit 1
 fi
 
-# Function to check if service exists
+# Function to check if service exists using Docker
 service_exists() {
     local service=$1
-    kurtosis enclave inspect "$ENCLAVE_NAME" | grep -q "[[:space:]]${service}[[:space:]]"
+    # Look for container with service name pattern in the enclave
+    local container_pattern="${service}--"
+    docker ps -a --format "table {{.Names}}" | grep -q "$container_pattern"
 }
 
-# Function to check if service is running
+# Function to check if service is running using Docker
 service_is_running() {
     local service=$1
-    kurtosis enclave inspect "$ENCLAVE_NAME" | grep -A 2 "[[:space:]]${service}[[:space:]]" | grep -q "RUNNING"
+    # Look for running container with service name pattern in the enclave
+    local container_pattern="${service}--"
+    docker ps --format "table {{.Names}}" | grep -q "$container_pattern"
+}
+
+# Function to get container ID for a service
+get_container_id() {
+    local service=$1
+    local container_pattern="${service}--"
+    docker ps -a --format "table {{.ID}}\t{{.Names}}" | grep "$container_pattern" | awk '{print $1}' | head -n1
 }
 
 # Prepare backup directory (clean if exists, else create)
@@ -65,7 +76,7 @@ POSTGRES_SERVICE="postgres-001"
 if ! service_exists "$POSTGRES_SERVICE"; then
     echo "ERROR: Postgres service '$POSTGRES_SERVICE' not found in enclave '$ENCLAVE_NAME'!"
     echo "Available services:"
-    kurtosis enclave inspect "$ENCLAVE_NAME" | grep -E "^[[:space:]]*[a-zA-Z0-9-]+(-[0-9]+)?[[:space:]]" | awk '{print $2}' | grep -v "^$"
+    docker ps -a --format "table {{.Names}}" | grep "${ENCLAVE_NAME}--" | sed 's/--[a-f0-9]\{32\}$//' | sort -u
     exit 1
 fi
 
@@ -74,7 +85,9 @@ echo "✅ Postgres service found"
 # Show current enclave status
 echo ""
 echo "=== Current enclave status ==="
-kurtosis enclave inspect "$ENCLAVE_NAME"
+echo "Enclave: $ENCLAVE_NAME"
+echo "Containers:"
+docker ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" | grep "${ENCLAVE_NAME}--"
 
 echo ""
 echo "=== CREATING DATABASE BACKUPS ==="
@@ -100,12 +113,19 @@ for db_name in "${!DATABASES[@]}"; do
 
     echo "Backing up $db_name database..."
 
+    # Get container ID for postgres service
+    local container_id=$(get_container_id "$POSTGRES_SERVICE")
+    if [ -z "$container_id" ]; then
+        echo "❌ Could not find container for $POSTGRES_SERVICE"
+        continue
+    fi
+
     # Try to backup the database
-    if kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password pg_dump -U $db_user -d $db_name > /tmp/$backup_file" 2>/dev/null; then
+    if docker exec "$container_id" bash -c "PGPASSWORD=master_password pg_dump -U $db_user -d $db_name > /tmp/$backup_file" 2>/dev/null; then
         echo "✅ Successfully backed up $db_name"
 
         # Check if the backup file was created and has content
-        file_size=$(kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "ls -lh /tmp/$backup_file 2>/dev/null | awk '{print \$5}' || echo '0'")
+        file_size=$(docker exec "$container_id" bash -c "ls -lh /tmp/$backup_file 2>/dev/null | awk '{print \$5}' || echo '0'")
         if [ "$file_size" != "0" ] && [ "$file_size" != "" ]; then
             echo "✅ Backup file size: $file_size"
         else
@@ -114,7 +134,7 @@ for db_name in "${!DATABASES[@]}"; do
 
         # Download the backup file via base64 stream into the specified backup directory
         echo "Downloading $backup_file from container via base64..."
-        if kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "base64 /tmp/$backup_file" > "$BACKUP_DIR/$backup_file.b64"; then
+        if docker exec "$container_id" bash -c "base64 /tmp/$backup_file" > "$BACKUP_DIR/$backup_file.b64"; then
             if base64 -d "$BACKUP_DIR/$backup_file.b64" > "$BACKUP_DIR/$backup_file"; then
                 rm -f "$BACKUP_DIR/$backup_file.b64"
                 file_size=$(du -h "$BACKUP_DIR/$backup_file" | cut -f1)
@@ -130,7 +150,7 @@ for db_name in "${!DATABASES[@]}"; do
         fi
 
         # Clean up the file from container
-        kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "rm -f /tmp/$backup_file"
+        docker exec "$container_id" bash -c "rm -f /tmp/$backup_file"
     else
         echo "⚠️  Could not backup $db_name database (database might not exist or be empty)"
     fi
@@ -151,15 +171,22 @@ backup_erigon_datadir() {
 
     echo "Preparing to backup blockchain data from $service_name..."
 
+    # Get container ID for the service
+    local container_id=$(get_container_id "$service_name")
+    if [ -z "$container_id" ]; then
+        echo "❌ Could not find container for $service_name"
+        return 0
+    fi
+
     if service_is_running "$service_name"; then
         # Online archive without stopping the service
-        if kurtosis service exec "$ENCLAVE_NAME" "$service_name" "tar -czf /tmp/${out_file_name}.tar.gz -C /home/erigon/data dynamic-Attractor-sequencer"; then
+        if docker exec "$container_id" bash -c "tar -czf /tmp/${out_file_name}.tar.gz -C /home/erigon/data dynamic-Attractor-sequencer"; then
             echo "✅ Blockchain data archive created for $service_name"
-            kurtosis service exec "$ENCLAVE_NAME" "$service_name" "ls -lh /tmp/${out_file_name}.tar.gz"
+            docker exec "$container_id" bash -c "ls -lh /tmp/${out_file_name}.tar.gz"
 
             # Download archive via base64 stream into the specified backup directory
             echo "Downloading archive via base64 transfer..."
-            if kurtosis service exec "$ENCLAVE_NAME" "$service_name" "base64 /tmp/${out_file_name}.tar.gz" > "$BACKUP_DIR/${out_file_name}.tar.gz.b64"; then
+            if docker exec "$container_id" bash -c "base64 /tmp/${out_file_name}.tar.gz" > "$BACKUP_DIR/${out_file_name}.tar.gz.b64"; then
                 if base64 -d "$BACKUP_DIR/${out_file_name}.tar.gz.b64" > "$BACKUP_DIR/${out_file_name}.tar.gz"; then
                     rm -f "$BACKUP_DIR/${out_file_name}.tar.gz.b64"
                     echo "✅ Archive saved: $BACKUP_DIR/${out_file_name}.tar.gz"
@@ -167,7 +194,7 @@ backup_erigon_datadir() {
                     echo "❌ Failed to decode archive: $BACKUP_DIR/${out_file_name}.tar.gz.b64"
                 fi
                 # Clean up the file from container
-                kurtosis service exec "$ENCLAVE_NAME" "$service_name" "rm -f /tmp/${out_file_name}.tar.gz" || true
+                docker exec "$container_id" bash -c "rm -f /tmp/${out_file_name}.tar.gz" || true
             else
                 echo "❌ Failed to transfer archive via base64 for ${out_file_name}.tar.gz"
             fi
@@ -177,14 +204,13 @@ backup_erigon_datadir() {
     else
         echo "Service $service_name is not running; attempting offline copy via docker cp..."
         # Try to locate container (stopped) and copy data out
-        CONTAINER_ID=$(sudo docker ps -a | grep -F "${service_name}--" | awk '{print $1}' | head -n1)
-        if [ -z "$CONTAINER_ID" ]; then
+        if [ -z "$container_id" ]; then
             echo "❌ Could not find container ID for $service_name; skipping blockchain backup"
             return 0
         fi
         TMP_DIR=$(mktemp -d)
-        echo "Copying datadir from container $CONTAINER_ID..."
-        if sudo docker cp "$CONTAINER_ID:/home/erigon/data/dynamic-Attractor-sequencer" "$TMP_DIR/"; then
+        echo "Copying datadir from container $container_id..."
+        if docker cp "$container_id:/home/erigon/data/dynamic-Attractor-sequencer" "$TMP_DIR/"; then
             echo "Creating archive..."
             tar -czf "$BACKUP_DIR/${out_file_name}.tar.gz" -C "$TMP_DIR" dynamic-Attractor-sequencer && echo "✅ Archive saved: $BACKUP_DIR/${out_file_name}.tar.gz"
         else
@@ -233,8 +259,8 @@ if [ "$BACKUP_SUCCESS" = true ] && [ $BACKUP_COUNT -gt 0 ]; then
     echo "  ./scripts/update_service_safely.sh $ENCLAVE_NAME <service_name>"
     echo ""
     echo "To manually restore a specific database:"
-    echo "  kurtosis service files upload $ENCLAVE_NAME postgres-001 $BACKUP_DIR/<db_name>_backup.sql /tmp/"
-    echo "  kurtosis service exec $ENCLAVE_NAME postgres-001 'PGPASSWORD=master_password psql -U <user> -d <db_name> < /tmp/<db_name>_backup.sql'"
+    echo "  docker cp $BACKUP_DIR/<db_name>_backup.sql \$(docker ps -a --format 'table {{.ID}}\t{{.Names}}' | grep 'postgres-001--' | awk '{print \$1}' | head -n1):/tmp/"
+    echo "  docker exec \$(docker ps -a --format 'table {{.ID}}\t{{.Names}}' | grep 'postgres-001--' | awk '{print \$1}' | head -n1) bash -c 'PGPASSWORD=master_password psql -U <user> -d <db_name> < /tmp/<db_name>_backup.sql'"
 
     # Create a metadata file with backup information
     cat > "$BACKUP_DIR/backup_info.txt" << EOF

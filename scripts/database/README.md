@@ -1,4 +1,4 @@
-# Database Backup and Restore Scripts
+# Database Scripts
 
 This directory contains scripts for backing up and restoring service databases in L2 Attractor enclaves.
 
@@ -7,7 +7,7 @@ This directory contains scripts for backing up and restoring service databases i
 ### `create_backup.sh`
 Creates comprehensive backups of all service databases in a Kurtosis enclave.
 
-**Purpose:** Safeguard critical data before service rebuilds, migrations, or maintenance operations.
+**Purpose:** Safeguard critical data before maintenance, updates, or service rebuilds.
 
 **What it backs up:**
 - Prover database
@@ -22,25 +22,35 @@ Creates comprehensive backups of all service databases in a Kurtosis enclave.
 **Usage:** `./create_backup.sh <enclave_name> [backup_directory]`
 
 ### `restore_service_data.sh`
-Restores database dumps to running services after they have been rebuilt.
+Restores previously created database backups to running services in an enclave.
 
-**Purpose:** Restore service state and data after service reconstruction or when migrating to new enclaves.
+**Purpose:** Recover service data after rebuilding services or restoring from a backup.
 
 **What it restores:**
-- All available database backups from the specified backup directory
+- All available database dumps from the backup directory
 - Automatically detects and restores available backup files
 - Ensures data consistency across services
 
 **Usage:** `./restore_service_data.sh <enclave_name> <backup_directory>`
 
-## Typical Workflow
+## How It Works
 
-1. **Before maintenance:** Use `create_backup.sh` to save current state
-2. **After service rebuild:** Use `restore_service_data.sh` to restore data
-3. **Data migration:** Use both scripts to move data between enclaves
+Both scripts now use Docker container inspection and execution instead of Kurtosis CLI, making them completely independent and more reliable after server reboots or when Kurtosis CLI has issues.
 
-## Requirements
+**Service Detection:** Scripts look for containers with names matching the pattern `{service_name}--{enclave_uuid}` to identify services.
 
-- Kurtosis CLI installed and configured
-- Running enclave with PostgreSQL service
-- Appropriate permissions to access enclave services
+**Database Operations:** All PostgreSQL operations (backup, restore, verification) are performed using `docker exec` commands directly on the postgres container.
+
+**Blockchain Data:** Erigon data backup and restore operations use `docker exec` and `docker cp` commands for reliable data transfer.
+
+## Workflow
+
+1. **Backup:** Use `create_backup.sh` before making changes to services
+2. **Rebuild:** Rebuild services as needed
+3. **Restore:** Use `restore_service_data.sh` to restore data to rebuilt services
+
+## Prerequisites
+
+- Docker installed and running
+- Running enclave with postgres-001 service
+- Appropriate permissions to access Docker containers

@@ -23,11 +23,11 @@ echo "Enclave: $ENCLAVE_NAME"
 echo "Backup directory: $BACKUP_DIR"
 echo ""
 
-# Check if enclave exists
-if ! kurtosis enclave ls | grep -q "$ENCLAVE_NAME"; then
+# Check if enclave exists by looking for containers with enclave pattern
+if ! docker ps -a --format "table {{.Names}}" | grep -q "${ENCLAVE_NAME}--"; then
     echo "ERROR: Enclave '$ENCLAVE_NAME' not found!"
-    echo "Available enclaves:"
-    kurtosis enclave ls
+    echo "Available enclaves (by container names):"
+    docker ps -a --format "table {{.Names}}" | grep -E "--[a-f0-9]{32}$" | sed 's/--[a-f0-9]\{32\}$//' | sort -u
     exit 1
 fi
 
@@ -37,16 +37,27 @@ if [ ! -d "$BACKUP_DIR" ]; then
     exit 1
 fi
 
-# Function to check if service exists
+# Function to check if service exists using Docker
 service_exists() {
     local service=$1
-    kurtosis enclave inspect "$ENCLAVE_NAME" | grep -q "[[:space:]]${service}[[:space:]]"
+    # Look for container with service name pattern in the enclave
+    local container_pattern="${service}--"
+    docker ps -a --format "table {{.Names}}" | grep -q "$container_pattern"
 }
 
-# Function to check if service is running
+# Function to check if service is running using Docker
 service_is_running() {
     local service=$1
-    kurtosis enclave inspect "$ENCLAVE_NAME" | grep -A 2 "[[:space:]]${service}[[:space:]]" | grep -q "RUNNING"
+    # Look for running container with service name pattern in the enclave
+    local container_pattern="${service}--"
+    docker ps --format "table {{.Names}}" | grep -q "$container_pattern"
+}
+
+# Function to get container ID for a service
+get_container_id() {
+    local service=$1
+    local container_pattern="${service}--"
+    docker ps -a --format "table {{.ID}}\t{{.Names}}" | grep "$container_pattern" | awk '{print $1}' | head -n1
 }
 
 # Check if postgres service exists
@@ -54,7 +65,7 @@ POSTGRES_SERVICE="postgres-001"
 if ! service_exists "$POSTGRES_SERVICE"; then
     echo "ERROR: Postgres service '$POSTGRES_SERVICE' not found in enclave '$ENCLAVE_NAME'!"
     echo "Available services:"
-    kurtosis enclave inspect "$ENCLAVE_NAME" | grep -E "^[[:space:]]*[a-zA-Z0-9-]+(-[0-9]+)?[[:space:]]" | awk '{print $2}' | grep -v "^$"
+    docker ps -a --format "table {{.Names}}" | grep "${ENCLAVE_NAME}--" | sed 's/--[a-f0-9]\{32\}$//' | sort -u
     exit 1
 fi
 
@@ -126,39 +137,46 @@ restore_database() {
 
     echo "Restoring $db_name from $backup_file..."
 
+    # Get container ID for postgres service
+    local container_id=$(get_container_id "$POSTGRES_SERVICE")
+    if [ -z "$container_id" ]; then
+        echo "❌ Could not find container for $POSTGRES_SERVICE"
+        return 1
+    fi
+
     # Upload backup file to postgres container using base64
     echo "Uploading backup file to postgres container..."
 
     # Encode the backup file to base64 and upload
-    if base64 "$BACKUP_DIR/$backup_file" | kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "base64 -d > /tmp/$backup_file"; then
+    if base64 "$BACKUP_DIR/$backup_file" | docker exec "$container_id" bash -c "base64 -d > /tmp/$backup_file"; then
         echo "✅ File uploaded successfully"
 
         # Check if database exists and has active connections
         echo "Checking database $db_name status..."
 
         # Check if database exists (more reliable method)
-        db_exists_result=$(kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U master_user -d master -c \"SELECT datname FROM pg_database WHERE datname = '$db_name';\" 2>/dev/null | grep -c '$db_name' || echo '0'")
+        db_exists_result=$(docker exec "$container_id" bash -c "PGPASSWORD=master_password psql -U master_user -d master -c \"SELECT datname FROM pg_database WHERE datname = '$db_name';\" 2>/dev/null | grep -c '$db_name' || echo '0'")
 
         if [ "$db_exists_result" = "1" ]; then
             echo "Database $db_name exists. Force dropping and recreating for complete data replacement..."
 
             # Force drop database (terminate connections first)
             echo "Terminating all connections to $db_name..."
-            kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U master_user -d master -c \"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '$db_name' AND pid <> pg_backend_pid();\" 2>/dev/null || true"
+            docker exec "$container_id" bash -c "PGPASSWORD=master_password psql -U master_user -d master -c \"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '$db_name' AND pid <> pg_backend_pid();\" 2>/dev/null || true"
 
             echo "Dropping and recreating $db_name..."
-            kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U master_user -d master -c \"DROP DATABASE IF EXISTS $db_name;\""
-            kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U master_user -d master -c \"CREATE DATABASE $db_name;\""
-            kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U master_user -d master -c \"GRANT ALL PRIVILEGES ON DATABASE $db_name TO $db_user;\""
+            docker exec "$container_id" bash -c "PGPASSWORD=master_password psql -U master_user -d master -c \"DROP DATABASE IF EXISTS $db_name;\""
+            docker exec "$container_id" bash -c "PGPASSWORD=master_password psql -U master_user -d master -c \"CREATE DATABASE $db_name;\""
+            docker exec "$container_id" bash -c "PGPASSWORD=master_password psql -U master_user -d master -c \"GRANT ALL PRIVILEGES ON DATABASE $db_name TO $db_user;\""
         else
             echo "Creating database $db_name..."
-            kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U master_user -d master -c \"CREATE DATABASE $db_name;\""
-            kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U master_user -d master -c \"GRANT ALL PRIVILEGES ON DATABASE $db_name TO $db_user;\""
+            docker exec "$container_id" bash -c "PGPASSWORD=master_password psql -U master_user -d master -c \"CREATE DATABASE $db_name;\""
+            docker exec "$container_id" bash -c "PGPASSWORD=master_password psql -U master_user -d master -c \"GRANT ALL PRIVILEGES ON DATABASE $db_name TO $db_user;\""
         fi
 
         # Restore data
         echo "Restoring data to $db_name..."
-        if kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U $db_user -d $db_name < /tmp/$backup_file"; then
+        if docker exec "$container_id" bash -c "PGPASSWORD=master_password psql -U $db_user -d $db_name < /tmp/$backup_file"; then
             echo "✅ Successfully restored $db_name"
         else
             echo "❌ Failed to restore $db_name"
@@ -166,12 +184,12 @@ restore_database() {
         fi
 
         # Clean up uploaded file
-        kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "rm -f /tmp/$backup_file"
+        docker exec "$container_id" bash -c "rm -f /tmp/$backup_file"
     else
         echo "❌ Failed to upload backup file"
         return 1
     fi
-}
+ }
 
 # Helper to restore a specific erigon service from a given archive via docker cp
 restore_erigon_service_datadir() {
@@ -204,12 +222,12 @@ restore_erigon_service_datadir() {
 
     # Stop erigon process inside container (keep container alive via proc-runner TRAP)
     echo "Stopping erigon process (container stays up)..."
-    kurtosis service exec "$ENCLAVE_NAME" "$service_name" "kill -s TRAP 1 || kill -5 1" || true
+    docker exec "$CONTAINER_ID" bash -c "kill -s TRAP 1 || kill -5 1" || true
     sleep 2
 
     # Clean existing datadir contents to avoid mixing indexes
     echo "Cleaning datadir contents..."
-    kurtosis service exec "$ENCLAVE_NAME" "$service_name" "mkdir -p /home/erigon/data/dynamic-Attractor-sequencer && rm -rf /home/erigon/data/dynamic-Attractor-sequencer/*" || true
+    docker exec "$CONTAINER_ID" bash -c "mkdir -p /home/erigon/data/dynamic-Attractor-sequencer && rm -rf /home/erigon/data/dynamic-Attractor-sequencer/*" || true
 
     # Copy archive into container
     echo "Copying archive to container..."
@@ -220,18 +238,18 @@ restore_erigon_service_datadir() {
     echo "✅ Archive copied"
 
     # Verify inside container
-    kurtosis service exec "$ENCLAVE_NAME" "$service_name" "ls -lh /tmp/blockchain_data_backup.tar.gz"
+    docker exec "$CONTAINER_ID" bash -c "ls -lh /tmp/blockchain_data_backup.tar.gz"
 
     # Extract into datadir
     echo "Extracting into /home/erigon/data..."
-    if ! kurtosis service exec "$ENCLAVE_NAME" "$service_name" "cd /home/erigon/data && tar -xzf /tmp/blockchain_data_backup.tar.gz && rm -f /tmp/blockchain_data_backup.tar.gz && chown -R erigon:erigon dynamic-Attractor-sequencer || true"; then
+    if ! docker exec "$CONTAINER_ID" bash -c "cd /home/erigon/data && tar -xzf /tmp/blockchain_data_backup.tar.gz && rm -f /tmp/blockchain_data_backup.tar.gz && chown -R erigon:erigon dynamic-Attractor-sequencer || true"; then
         echo "❌ Extraction failed"
         return 1
     fi
     echo "✅ Extraction complete"
 
     # Verify datadir size
-    kurtosis service exec "$ENCLAVE_NAME" "$service_name" "du -sh /home/erigon/data/dynamic-Attractor-sequencer || true"
+    docker exec "$CONTAINER_ID" bash -c "du -sh /home/erigon/data/dynamic-Attractor-sequencer || true"
 
     # Restart the container via Docker to relaunch erigon
     echo "Restarting container via Docker..."
@@ -332,12 +350,19 @@ echo ""
 echo "=== VERIFICATION ==="
 echo "Checking database connectivity..."
 
+# Get container ID for postgres service for verification
+local container_id=$(get_container_id "$POSTGRES_SERVICE")
+if [ -z "$container_id" ]; then
+    echo "❌ Could not find container for $POSTGRES_SERVICE during verification"
+    exit 1
+fi
+
 # Test database connections
 for db_file in "${BACKUP_FILES[@]}"; do
     case $db_file in
         "prover_db_backup.sql")
             echo "Testing prover_db connection..."
-            if kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U prover_user -d prover_db -c 'SELECT 1;'" >/dev/null 2>&1; then
+            if docker exec "$container_id" bash -c "PGPASSWORD=master_password psql -U prover_user -d prover_db -c 'SELECT 1;'" >/dev/null 2>&1; then
                 echo "✅ prover_db is accessible"
             else
                 echo "❌ prover_db is not accessible"
@@ -345,7 +370,7 @@ for db_file in "${BACKUP_FILES[@]}"; do
             ;;
         "aggregator_db_backup.sql")
             echo "Testing aggregator_db connection..."
-            if kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U aggregator_user -d aggregator_db -c 'SELECT 1;'" >/dev/null 2>&1; then
+            if docker exec "$container_id" bash -c "PGPASSWORD=master_password psql -U aggregator_user -d aggregator_db -c 'SELECT 1;'" >/dev/null 2>&1; then
                 echo "✅ aggregator_db is accessible"
             else
                 echo "❌ aggregator_db is not accessible"
@@ -353,7 +378,7 @@ for db_file in "${BACKUP_FILES[@]}"; do
             ;;
         "bridge_db_backup.sql")
             echo "Testing bridge_db connection..."
-            if kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U bridge_user -d bridge_db -c 'SELECT 1;'" >/dev/null 2>&1; then
+            if docker exec "$container_id" bash -c "PGPASSWORD=master_password psql -U bridge_user -d bridge_db -c 'SELECT 1;'" >/dev/null 2>&1; then
                 echo "✅ bridge_db is accessible"
             else
                 echo "❌ bridge_db is not accessible"
@@ -361,7 +386,7 @@ for db_file in "${BACKUP_FILES[@]}"; do
             ;;
         "dac_db_backup.sql")
             echo "Testing dac_db connection..."
-            if kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U dac_user -d dac_db -c 'SELECT 1;'" >/dev/null 2>&1; then
+            if docker exec "$container_id" bash -c "PGPASSWORD=master_password psql -U dac_user -d dac_db -c 'SELECT 1;'" >/dev/null 2>&1; then
                 echo "✅ dac_db is accessible"
             else
                 echo "❌ dac_db is not accessible"
@@ -369,7 +394,7 @@ for db_file in "${BACKUP_FILES[@]}"; do
             ;;
         "pool_manager_db_backup.sql")
             echo "Testing pool_manager_db connection..."
-            if kurtosis service exec "$ENCLAVE_NAME" "$POSTGRES_SERVICE" "PGPASSWORD=master_password psql -U pool_manager_user -d pool_manager_db -c 'SELECT 1;'" >/dev/null 2>&1; then
+            if docker exec "$container_id" bash -c "PGPASSWORD=master_password psql -U pool_manager_user -d pool_manager_db -c 'SELECT 1;'" >/dev/null 2>&1; then
                 echo "✅ pool_manager_db is accessible"
             else
                 echo "❌ pool_manager_db is not accessible"
