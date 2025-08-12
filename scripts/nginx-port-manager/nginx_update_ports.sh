@@ -81,7 +81,8 @@ get_service_ports() {
         grep "^$container_prefix" | \
         grep -o "0\.0\.0\.0:\([0-9]\+\)->$internal_port" | \
         cut -d: -f2 | \
-        cut -d- -f1)
+        cut -d- -f1 | \
+        head -1)
     
     # If no external port found, check if container has internal port without external mapping
     if [[ -z "$port" ]]; then
@@ -103,10 +104,12 @@ extract_ports() {
     log "Extracting ports from docker containers..."
     
     # RPC service (cdk-erigon-sequencer)
+    log "Searching for RPC ports in cdk-erigon-sequencer container..."
     RPC_HTTP_PORT=$(get_service_ports "cdk-erigon-sequencer" "8123")
     RPC_WS_PORT=$(get_service_ports "cdk-erigon-sequencer" "8133")
     
     # Explorer services
+    log "Searching for Explorer ports..."
     EXPLORER_FRONTEND_PORT=$(get_service_ports "bs-frontend" "3000")
     EXPLORER_API_PORT=$(get_service_ports "bs-backend" "4004")
     EXPLORER_STATS_PORT=$(get_service_ports "bs-stats" "8050")
