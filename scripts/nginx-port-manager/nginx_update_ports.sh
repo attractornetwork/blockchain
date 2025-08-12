@@ -71,35 +71,33 @@ backup_configs() {
     log "Backup created in $BACKUP_DIR"
 }
 
-# Function to get ports from Kurtosis
+# Function to get ports from Docker containers
 get_service_ports() {
     local service_name="$1"
-    local port_type="$2"
+    local internal_port="$2"
     
-
-    
-    local port=$(kurtosis enclave inspect "$ENCLAVE_NAME" 2>/dev/null | \
-        grep -A 10 "$service_name" | \
-        grep "$port_type" | \
-        grep -o '127\.0\.0\.1:[0-9]\+' | \
-        cut -d':' -f2 | \
-        head -1)
+    # Extract external port from docker ps output
+    local port=$(docker ps --format "table {{.Names}}\t{{.Ports}}" | \
+        grep "$service_name" | \
+        grep -o "0\.0\.0\.0:\([0-9]\+\)->$internal_port" | \
+        cut -d: -f2 | \
+        cut -d- -f1)
     
     echo "$port"
 }
 
 # Function to extract all ports
 extract_ports() {
-    log "Extracting ports from enclave '$ENCLAVE_NAME'..."
+    log "Extracting ports from docker containers..."
     
     # RPC service (cdk-erigon-sequencer)
-    RPC_HTTP_PORT=$(get_service_ports "cdk-erigon-sequencer" "rpc")
-    RPC_WS_PORT=$(get_service_ports "cdk-erigon-sequencer" "ws-rpc")
+    RPC_HTTP_PORT=$(get_service_ports "cdk-erigon-sequencer" "6060")
+    RPC_WS_PORT=$(get_service_ports "cdk-erigon-sequencer" "6900")
     
     # Explorer services
-    EXPLORER_FRONTEND_PORT=$(get_service_ports "bs-frontend" "frontend")
-    EXPLORER_API_PORT=$(get_service_ports "bs-backend" "backend")
-    EXPLORER_STATS_PORT=$(get_service_ports "bs-stats" "stats")
+    EXPLORER_FRONTEND_PORT=$(get_service_ports "bs-frontend" "3000")
+    EXPLORER_API_PORT=$(get_service_ports "bs-backend" "50102")
+    EXPLORER_STATS_PORT=$(get_service_ports "bs-stats" "8050")
     EXPLORER_SOCKET_PORT="$RPC_WS_PORT"  # Use same WS port
     
     # Show found ports
