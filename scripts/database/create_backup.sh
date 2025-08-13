@@ -186,6 +186,11 @@ backup_erigon_datadir() {
     local service_name="$1"
     local out_file_name="$2"
 
+    if [ -z "$service_name" ]; then
+        echo "No service name provided, skipping"
+        return 0
+    fi
+
     if ! service_exists "$service_name"; then
         echo "No service '$service_name' found, skipping"
         return 0
@@ -244,12 +249,22 @@ backup_erigon_datadir() {
 }
 
 # Бэкап sequencer
-ERIGON_SEQUENCER="${ENCLAVE_NAME}-erigon-sequencer-001"
-backup_erigon_datadir "$ERIGON_SEQUENCER" "blockchain_data_backup_sequencer"
+ERIGON_SEQUENCER=$(find_service_name "erigon-sequencer-001")
+if [ -n "$ERIGON_SEQUENCER" ]; then
+    echo "Found sequencer service: $ERIGON_SEQUENCER"
+    backup_erigon_datadir "$ERIGON_SEQUENCER" "blockchain_data_backup_sequencer"
+else
+    echo "⚠️  Sequencer service not found, skipping"
+fi
 
 # Бэкап rpc-ноды (ускоряет восстановление и проверку транзакций)
-ERIGON_RPC="${ENCLAVE_NAME}-erigon-rpc-001"
-backup_erigon_datadir "$ERIGON_RPC" "blockchain_data_backup_rpc"
+ERIGON_RPC=$(find_service_name "erigon-rpc-001")
+if [ -n "$ERIGON_RPC" ]; then
+    echo "Found RPC service: $ERIGON_RPC"
+    backup_erigon_datadir "$ERIGON_RPC" "blockchain_data_backup_rpc"
+else
+    echo "⚠️  RPC service not found, skipping"
+fi
 
 echo ""
 echo "=== BACKUP SUMMARY ==="
