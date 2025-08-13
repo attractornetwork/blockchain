@@ -1,11 +1,11 @@
 databases_package = import_module("../../databases.star")
 grafana_package = import_module(
-    "github.com/kurtosis-tech/grafana-package/main.star@cc66468b167d16c0fc7153980be5b67550be01be"
+    "github.com/attractornetwork/grafana-package/main.star@master"
 )
 
 GRAFANA_VERSION = "11.1.4"
-GRAFANA_DASHBOARDS = "github.com/0xPolygon/kurtosis-cdk/static_files/additional_services/grafana-config/dashboards"
-GRAFANA_ALERTING_TEMPLATE = "github.com/0xPolygon/kurtosis-cdk/static_files/additional_services/grafana-config/alerting.yml.tmpl"
+GRAFANA_DASHBOARDS = "github.com/attractornetwork/blockchain/static_files/additional_services/grafana-config/dashboards"
+GRAFANA_ALERTING_TEMPLATE = "github.com/attractornetwork/blockchain/static_files/additional_services/grafana-config/alerting.yml.tmpl"
 
 SLACK_CHANNEL = ""
 SLACK_TOKEN = ""
@@ -51,4 +51,6 @@ def run(plan, args):
         grafana_alerting_template=GRAFANA_ALERTING_TEMPLATE,
         grafana_alerting_data=grafana_alerting_data,
         postgres_databases=postgres_databases,
+        grafana_external_url="https://dashboard.testnet.attra.me",
+        enable_https=True,
     )
