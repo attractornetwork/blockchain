@@ -70,6 +70,14 @@ get_container_id() {
         '
 }
 
+# Find actual service name (returns first match) given a short name
+find_service_name() {
+    local short=$1
+    docker ps -a --format '{{.Names}}' \
+      | grep -E -- "(^${ENCLAVE_NAME}-.*${short}(--[a-f0-9]{32})?$)|(^${short}(--[a-f0-9]{32})?$)" \
+      | head -n1
+}
+
 # Check if postgres service exists (autodiscover)
 POSTGRES_SERVICE=$(docker ps -a --format '{{.Names}}' | awk -v pref="$ENCLAVE_NAME" '/postgres-001/ {print $0}' | head -n1)
 if [ -z "$POSTGRES_SERVICE" ]; then
@@ -305,14 +313,26 @@ restore_blockchain_data() {
 
     if [ -f "$backup_seq" ]; then
         echo "Restoring sequencer from: $backup_seq"
-        restore_erigon_service_datadir "${ENCLAVE_NAME}-erigon-sequencer-001" "$backup_seq" || return 1
-        restored_any=true
+        local sequencer_service=$(find_service_name "erigon-sequencer-001")
+        if [ -n "$sequencer_service" ]; then
+            echo "Found sequencer service: $sequencer_service"
+            restore_erigon_service_datadir "$sequencer_service" "$backup_seq" || return 1
+            restored_any=true
+        else
+            echo "⚠️  Sequencer service not found, skipping"
+        fi
     fi
 
     if [ -f "$backup_rpc" ]; then
         echo "Restoring rpc node from: $backup_rpc"
-        restore_erigon_service_datadir "${ENCLAVE_NAME}-erigon-rpc-001" "$backup_rpc" || return 1
-        restored_any=true
+        local rpc_service=$(find_service_name "erigon-rpc-001")
+        if [ -n "$rpc_service" ]; then
+            echo "Found RPC service: $rpc_service"
+            restore_erigon_service_datadir "$rpc_service" "$backup_rpc" || return 1
+            restored_any=true
+        else
+            echo "⚠️  RPC service not found, skipping"
+        fi
     fi
 
     return 0
@@ -367,10 +387,10 @@ if [ "$RESTORATION_SUCCESS" = true ]; then
     echo ""
     echo "Next steps:"
     echo "1. Start your services that were rebuilt:"
-    echo "   kurtosis service start $ENCLAVE_NAME <service_name>"
+    echo "   docker restart <container_name>"
     echo ""
     echo "2. Verify data integrity:"
-    echo "   kurtosis service logs $ENCLAVE_NAME <service_name>"
+    echo "   docker logs <container_name>"
     echo ""
     echo "3. Run sanity checks:"
     echo "   ./scripts/sanity-check.sh"
