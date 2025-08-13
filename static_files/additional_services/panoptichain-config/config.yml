@@ -5,12 +5,13 @@ http:
 
 providers:
   system:
-    interval: 15s
+    interval: 3600s
 
   rpc:
     - name: "L1"
       url: "{{.l1_rpc_url}}"
       label: "L1"
+      interval: 3600s
       contracts:
         rollup_manager_address: "{{.zkevm_rollup_manager_address}}"
       time_to_mine:
@@ -36,6 +37,7 @@ providers:
     - name: "L2"
       url: "{{.l2_rpc_url}}"
       label: "L2"
+      interval: 3600s
       contracts:
         global_exit_root_l2_address: "{{.zkevm_global_exit_root_l2_address}}"
         zkevm_bridge_address: "{{.zkevm_bridge_l2_address}}"

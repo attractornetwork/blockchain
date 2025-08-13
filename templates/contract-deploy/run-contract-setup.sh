@@ -23,7 +23,7 @@ wait_for_rpc_to_be_available() {
             echo_ts "Exceeded maximum retry attempts. Exiting."
             exit 1
         fi
-        sleep 5
+        sleep 10
     done
 }
 
@@ -361,7 +361,7 @@ if [[ $l1_preset == "minimal" ]]; then
     current_block_number="$(cast block-number --rpc-url '{{.l1_rpc_url}}')"
     finalized_block_number=0
     until [[ $finalized_block_number -gt $current_block_number ]]; do
-        sleep 5
+        sleep 30
         finalized_block_number="$(cast block-number --rpc-url '{{.l1_rpc_url}}' finalized)"
     done
 fi

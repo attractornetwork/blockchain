@@ -61,7 +61,7 @@ polycli ulxly bridge asset \
 current_block_number="$(cast block-number --rpc-url "$L1_RPC_URL")"
 finalized_block_number=0
 until [[ "$finalized_block_number" -gt "$current_block_number" ]]; do
-    sleep 5
+    sleep 3600
     finalized_block_number="$(cast block-number --rpc-url "$L1_RPC_URL" finalized)"
 done
 
@@ -78,7 +78,7 @@ while true; do
         --private-key "$PRIVATE_KEY" \
         --chain-id "$L1_CHAIN_ID" \
         --pretty-logs=false
-    sleep 1
+    sleep 3600
 
     echo "Bridging from L2 to L1"
     polycli ulxly bridge asset \
@@ -91,5 +91,5 @@ while true; do
         --private-key "$PRIVATE_KEY" \
         --chain-id "$L2_CHAIN_ID" \
         --pretty-logs=false
-    sleep 1
+    sleep 3600
 done

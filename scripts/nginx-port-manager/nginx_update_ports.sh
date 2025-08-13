@@ -291,6 +291,12 @@ server {
 test_nginx_config() {
     log "Testing nginx configuration..."
     
+    # Check if container exists and is running
+    if ! docker ps | grep -q "attractor-nginx"; then
+        log "ERROR" "Nginx container is not running"
+        return 1
+    fi
+    
     # Test nginx configuration using docker
     if docker exec attractor-nginx nginx -t >/dev/null 2>&1; then
         log "Nginx configuration is valid"
@@ -323,7 +329,19 @@ reload_nginx() {
     log "Starting containers with new configuration..."
     if docker compose up -d; then
         log "SUCCESS" "Nginx containers restarted successfully with new configuration"
-        return 0
+        
+        # Wait for containers to be fully ready
+        log "Waiting for containers to be ready..."
+        sleep 5
+        
+        # Verify containers are running
+        if docker ps | grep -q "attractor-nginx"; then
+            log "Nginx container is running and ready"
+            return 0
+        else
+            log "ERROR" "Nginx container failed to start properly"
+            return 1
+        fi
     else
         log "ERROR" "Failed to restart nginx containers"
         return 1
@@ -388,16 +406,20 @@ main() {
         exit 1
     fi
     
-    # Check configuration
-    if test_nginx_config; then
-        # Reload nginx
-        if reload_nginx; then
+    # First reload nginx to get containers running
+    if reload_nginx; then
+        log "Nginx containers started successfully"
+        
+        # Now test configuration
+        if test_nginx_config; then
             log "SUCCESS" "Port update completed successfully!"
         else
+            log "ERROR" "Nginx configuration test failed, restoring from backup..."
             restore_from_backup
             exit 1
         fi
     else
+        log "ERROR" "Failed to start nginx containers, restoring from backup..."
         restore_from_backup
         exit 1
     fi
