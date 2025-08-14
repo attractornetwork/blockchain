@@ -41,7 +41,7 @@ log.dir.path: /tmp/cdk-erigon.log
 
 # --------------------------------------------------------------------------------------------------
 # The data directory for the databases.
-datadir: ./data/dynamic-{{.chain_name}}-sequencer
+datadir: ./data/dynamic-{{.chain_name}}-{{if .is_sequencer}}sequencer{{else}}rpc{{end}}
 
 # The network identifier.
 # For testnets, use --chain <testnet-name> instead.
