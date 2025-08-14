@@ -51,6 +51,4 @@ def run(plan, args):
         grafana_alerting_template=GRAFANA_ALERTING_TEMPLATE,
         grafana_alerting_data=grafana_alerting_data,
         postgres_databases=postgres_databases,
-        grafana_external_url="https://dashboard.testnet.attra.me",
-        enable_https=True,
     )
