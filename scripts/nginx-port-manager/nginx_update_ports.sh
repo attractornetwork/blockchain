@@ -134,6 +134,11 @@ extract_ports() {
     log "Searching for Grafana ports..."
     GRAFANA_PORT=$(get_service_ports "grafana" "3000")
     
+    # Bridge services
+    log "Searching for Bridge ports..."
+    BRIDGE_SERVICE_PORT=$(get_service_ports "zkevm-bridge-service" "8080")
+    BRIDGE_UI_PORT=$(get_service_ports "zkevm-bridge-ui" "80")
+    
     # Show found ports
     log "Found ports:"
     echo "  RPC HTTP: ${RPC_HTTP_PORT:-not found}" 
@@ -142,6 +147,8 @@ extract_ports() {
     echo "  Explorer API: ${EXPLORER_API_PORT:-not found}"
     echo "  Explorer Stats: ${EXPLORER_STATS_PORT:-not found}"
     echo "  Grafana: ${GRAFANA_PORT:-not found}"
+    echo "  Bridge Service: ${BRIDGE_SERVICE_PORT:-not found}"
+    echo "  Bridge UI: ${BRIDGE_UI_PORT:-not found}"
     
     return 0
 }
@@ -351,6 +358,66 @@ server {
     create_config "Grafana" "$config_file" "$template"
 }
 
+# Function to update Bridge configuration
+update_bridge_config() {
+    local config_file="$NGINX_CONF_DIR/bridge.testnet.attra.me.conf"
+    
+    if [[ -z "$BRIDGE_SERVICE_PORT" || -z "$BRIDGE_UI_PORT" ]]; then
+        log "ERROR: Failed to find ports for Bridge service"
+        return 1
+    fi
+    
+    log "Updating Bridge configuration (Service: $BRIDGE_SERVICE_PORT, UI: $BRIDGE_UI_PORT)..."
+    
+    local template="map \$request_uri \$backend_port {
+    ~^/api/      $BRIDGE_SERVICE_PORT;
+    default      $BRIDGE_UI_PORT;
+}
+
+server {
+    listen 80;
+    server_name bridge.testnet.attra.me;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        proxy_pass              http://127.0.0.1:\$backend_port;
+        proxy_set_header        Host               \$host;
+        proxy_set_header        X-Real-IP          \$remote_addr;
+        proxy_set_header        X-Forwarded-For    \$proxy_add_x_forwarded_for;
+        proxy_set_header        X-Forwarded-Proto  \$scheme;
+        proxy_http_version      1.1;
+        proxy_read_timeout      300s;
+        proxy_send_timeout      300s;
+        proxy_connect_timeout   75s;
+    }
+}
+
+server {
+    listen 443 ssl http2;
+    server_name bridge.testnet.attra.me;
+
+    ssl_certificate     /etc/letsencrypt/live/da.testnet.attra.me/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/da.testnet.attra.me/privkey.pem;
+
+    location / {
+        proxy_pass              http://127.0.0.1:\$backend_port;
+        proxy_set_header        Host               \$host;
+        proxy_set_header        X-Real-IP          \$remote_addr;
+        proxy_set_header        X-Forwarded-For    \$proxy_add_x_forwarded_for;
+        proxy_set_header        X-Forwarded-Proto  \$scheme;
+        proxy_http_version      1.1;
+        proxy_read_timeout      300s;
+        proxy_send_timeout      300s;
+        proxy_connect_timeout   75s;
+    }
+}"
+    
+    create_config "Bridge" "$config_file" "$template"
+}
+
 # Function to test nginx configuration
 test_nginx_config() {
     log "Testing nginx configuration..."
@@ -474,6 +541,13 @@ main() {
         log "Grafana configuration updated"
     else
         log "ERROR: Failed to update Grafana configuration"
+        exit 1
+    fi
+
+    if update_bridge_config; then
+        log "Bridge configuration updated"
+    else
+        log "ERROR: Failed to update Bridge configuration"
         exit 1
     fi
     
