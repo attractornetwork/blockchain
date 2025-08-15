@@ -130,6 +130,10 @@ extract_ports() {
     EXPLORER_STATS_PORT=$(get_service_ports "bs-stats" "8050")
     EXPLORER_SOCKET_PORT="$RPC_WS_PORT"  # Use same WS port
     
+    # Grafana service
+    log "Searching for Grafana ports..."
+    GRAFANA_PORT=$(get_service_ports "grafana" "3000")
+    
     # Show found ports
     log "Found ports:"
     echo "  RPC HTTP: ${RPC_HTTP_PORT:-not found}" 
@@ -137,6 +141,7 @@ extract_ports() {
     echo "  Explorer Frontend: ${EXPLORER_FRONTEND_PORT:-not found}"
     echo "  Explorer API: ${EXPLORER_API_PORT:-not found}"
     echo "  Explorer Stats: ${EXPLORER_STATS_PORT:-not found}"
+    echo "  Grafana: ${GRAFANA_PORT:-not found}"
     
     return 0
 }
@@ -287,6 +292,65 @@ server {
     create_config "Explorer" "$config_file" "$template"
 }
 
+# Function to update Grafana configuration
+update_grafana_config() {
+    local config_file="$NGINX_CONF_DIR/dashboard.testnet.attra.me.conf"
+    
+    if [[ -z "$GRAFANA_PORT" ]]; then
+        log "ERROR: Failed to find port for Grafana service"
+        return 1
+    fi
+    
+    log "Updating Grafana configuration (Port: $GRAFANA_PORT)..."
+    
+    local template="server {
+    listen 443 ssl http2;
+    server_name dashboard.testnet.attra.me;
+
+    ssl_certificate     /etc/letsencrypt/live/da.testnet.attra.me/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/da.testnet.attra.me/privkey.pem;
+
+    location / {
+        proxy_pass              http://127.0.0.1:$GRAFANA_PORT;
+        proxy_set_header        Host               \$host;
+        proxy_set_header        X-Real-IP          \$remote_addr;
+        proxy_set_header        X-Forwarded-For    \$proxy_add_x_forwarded_for;
+        proxy_set_header        X-Forwarded-Proto  \$scheme;
+        proxy_http_version      1.1;
+        proxy_set_header        Upgrade            \$http_upgrade;
+        proxy_set_header        Connection         \$connection_upgrade;
+        proxy_read_timeout      300s;
+        proxy_send_timeout      300s;
+        proxy_connect_timeout   75s;
+    }
+}
+
+server {
+    listen 80;
+    server_name dashboard.testnet.attra.me;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        proxy_pass              http://127.0.0.1:$GRAFANA_PORT;
+        proxy_set_header        Host               \$host;
+        proxy_set_header        X-Real-IP          \$remote_addr;
+        proxy_set_header        X-Forwarded-For    \$proxy_add_x_forwarded_for;
+        proxy_set_header        X-Forwarded-Proto  \$scheme;
+        proxy_http_version      1.1;
+        proxy_set_header        Upgrade            \$http_upgrade;
+        proxy_set_header        Connection         \$connection_upgrade;
+        proxy_read_timeout      300s;
+        proxy_send_timeout      300s;
+        proxy_connect_timeout   75s;
+    }
+}"
+    
+    create_config "Grafana" "$config_file" "$template"
+}
+
 # Function to test nginx configuration
 test_nginx_config() {
     log "Testing nginx configuration..."
@@ -403,6 +467,13 @@ main() {
         log "Explorer configuration updated"
     else
         log "ERROR: Failed to update Explorer configuration"
+        exit 1
+    fi
+
+    if update_grafana_config; then
+        log "Grafana configuration updated"
+    else
+        log "ERROR: Failed to update Grafana configuration"
         exit 1
     fi
     
