@@ -43,9 +43,9 @@ def run(
         zkevm_bridge_package.start_bridge_ui(plan, args, bridge_ui_config_artifact)
 
         # Start the bridge UI reverse proxy. This is only relevant / needed if we have a fake l1
-        # if args["use_local_l1"]:
-            # proxy_config_artifact = create_reverse_proxy_config_artifact(plan, args)
-            # zkevm_bridge_package.start_reverse_proxy(plan, args, proxy_config_artifact)
+        if args["use_local_l1"]:
+            proxy_config_artifact = create_reverse_proxy_config_artifact(plan, args)
+            zkevm_bridge_package.start_reverse_proxy(plan, args, proxy_config_artifact)
 
 
 def create_bridge_config_artifact(
@@ -95,15 +95,6 @@ def create_bridge_config_artifact(
 
 def create_bridge_ui_config_artifact(plan, args, contract_setup_addresses):
     bridge_ui_config_template = read_file("./templates/bridge-infra/.env")
-
-    l2rpc_service = plan.get_service(
-        name=args["l2_rpc_name"] + args["deployment_suffix"]
-    )
-
-    bridge_service = plan.get_service(
-        name="zkevm-bridge-service" + args["deployment_suffix"]
-    )
-
     return plan.render_templates(
         name="bridge-ui-config-artifact",
         config={
@@ -112,12 +103,6 @@ def create_bridge_ui_config_artifact(plan, args, contract_setup_addresses):
                 data={
                     "l1_explorer_url": args["l1_explorer_url"],
                     "zkevm_explorer_url": args["polygon_zkevm_explorer"],
-                    "bridgeservice_api_url": "http://{}:{}".format(
-                        bridge_service.ip_address, bridge_service.ports["rpc"].number
-                    ),
-                    "l2_rpc_url": "http://{}:{}".format(
-                        l2rpc_service.ip_address, l2rpc_service.ports["rpc"].number
-                    ),
                 }
                 | contract_setup_addresses,
             )
@@ -130,7 +115,7 @@ def create_reverse_proxy_config_artifact(plan, args):
         src="./templates/bridge-infra/haproxy.cfg"
     )
 
-    l1_rpc_url = args["l1_rpc_url"]
+    l1_rpc_url = args["mitm_rpc_url"].get("bridge", args["l1_rpc_url"])
     l1rpc_host = l1_rpc_url.split(":")[1].replace("//", "")
     l1rpc_port = l1_rpc_url.split(":")[2]
     l2rpc_service = plan.get_service(

@@ -100,7 +100,7 @@ def run(plan, args, deployment_stages, contract_setup_addresses):
             description="Starting the DAC",
         )
 
-    if args["sequencer_type"] == "erigon" and args.get("use_cdk_node_as_sequencer", False) == True:
+    if args["sequencer_type"] == "erigon":
         agglayer_endpoint = get_agglayer_endpoint(plan, args, deployment_stages)
         # Create the cdk node config.
         node_config_template = read_file(
@@ -159,11 +159,17 @@ def get_keystores_artifacts(plan, args):
         service_name="contracts" + args["deployment_suffix"],
         src="/opt/zkevm/dac.keystore",
     )
+    claim_sponsor_keystore_artifact = plan.store_service_files(
+        name="claimsponsor-keystore-cdk",
+        service_name="contracts" + args["deployment_suffix"],
+        src="/opt/zkevm/claimsponsor.keystore",
+    )
     return struct(
         sequencer=sequencer_keystore_artifact,
         aggregator=aggregator_keystore_artifact,
         proofsigner=proofsigner_keystore_artifact,
         dac=dac_keystore_artifact,
+        claim_sponsor=claim_sponsor_keystore_artifact,
     )
 
 

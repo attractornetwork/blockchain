@@ -54,7 +54,7 @@
      * runHashDBServer enables HashDB GRPC service, which provides SMT
      * (Sparse Merkle Tree) and database access. Within the node, the
      * merkletree package uses this serves to read the state tree and
-     * various components like the pool, sychronizer, and datastreamer
+     * various components like the pool, synchronizer, and datastreamer
      * can use this service.
      *
      * Generally every instance of the prover or executor runs their
@@ -232,7 +232,7 @@
      * `requestsPersistence' will be purged every
      * `cleanerPollingPeriod' seconds
      */ -}}
-    "cleanerPollingPeriod": 12000,
+    "cleanerPollingPeriod": 600,
 
 {{- /*
      * requestsPersistence is the amount of time that completed

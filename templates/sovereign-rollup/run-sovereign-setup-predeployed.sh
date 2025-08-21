@@ -3,6 +3,9 @@
 # Create New Rollup Step
 pushd /opt/zkevm-contracts || exit 1
 
+# Requirement to correctly configure contracts deployer
+export DEPLOYER_PRIVATE_KEY="{{.zkevm_l2_admin_private_key}}"
+
 ts=$(date +%s)
 
 # Extract the rollup manager address from the JSON file. .zkevm_rollup_manager_address is not available at the time of importing this script.
@@ -31,14 +34,18 @@ cp /opt/contract-deploy/create_new_rollup.json /opt/zkevm-contracts/tools/create
 cp /opt/zkevm-contracts/deployment/v2/genesis.json  /opt/zkevm-contracts/tools/addRollupType/genesis.json
 cp /opt/zkevm-contracts/deployment/v2/genesis.json  /opt/zkevm-contracts/tools/createNewRollup/genesis.json
 
+cp /opt/zkevm/combined.json /opt/zkevm-contracts/deployment/v2/deploy_output.json
+
 deployOPSuccinct="{{ .deploy_op_succinct }}"
 if [[ $deployOPSuccinct == true ]]; then
+rm /opt/zkevm-contracts/tools/addRollupType/add_rollup_type_output-*.json
 npx hardhat run tools/addRollupType/addRollupType.ts --network localhost 2>&1 | tee 06_create_rollup_type.out
 cp /opt/zkevm-contracts/tools/addRollupType/add_rollup_type_output-*.json /opt/zkevm/add_rollup_type_output.json
 rollup_type_id=$(jq -r '.rollupTypeID' /opt/zkevm/add_rollup_type_output.json)
 jq --arg rtid "$rollup_type_id"  '.rollupTypeId = $rtid' /opt/zkevm-contracts/tools/createNewRollup/create_new_rollup.json > /opt/zkevm-contracts/tools/createNewRollup/create_new_rollup.json.tmp
 mv /opt/zkevm-contracts/tools/createNewRollup/create_new_rollup.json.tmp /opt/zkevm-contracts/tools/createNewRollup/create_new_rollup.json
 
+rm /opt/zkevm-contracts/tools/createNewRollup/create_new_rollup_output_*.json
 npx hardhat run ./tools/createNewRollup/createNewRollup.ts --network localhost 2>&1 | tee 07_create_sovereign_rollup.out
 cp /opt/zkevm-contracts/tools/createNewRollup/create_new_rollup_output_*.json /opt/zkevm/create_rollup_output.json
 else

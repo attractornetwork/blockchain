@@ -1,4 +1,5 @@
 data_availability_package = import_module("./data_availability.star")
+constants = import_module("../src/package_io/constants.star")
 
 
 def get_contract_setup_addresses(plan, args, deployment_stages):
@@ -54,19 +55,45 @@ def get_exec_recipe_result(result):
 
 # Return the HTTP and WS URLs of the L2 RPC service.
 def get_l2_rpc_url(plan, args):
-    l2_rpc_service = plan.get_service(
-        name=args["l2_rpc_name"] + args["deployment_suffix"]
+    service = plan.get_service(name=args["l2_rpc_name"] + args["deployment_suffix"])
+
+    # Get L2 rpc http url.
+    http_url = ""
+    if "rpc" in service.ports:
+        http_url = "http://{}:{}".format(
+            service.ip_address, service.ports["rpc"].number
+        )
+    else:
+        plan.print("No rpc port found for service: '{}'".format(service.name))
+
+    # Get L2 rpc ws url.
+    ws_url = ""
+    if "ws-rpc" in service.ports:
+        ws_url = "ws://{}:{}".format(service.ip_address, service.ports["ws-rpc"].number)
+    elif "ws" in service.ports:
+        ws_url = "ws://{}:{}".format(service.ip_address, service.ports["ws"].number)
+    else:
+        plan.print("No ws rpc port found for service: '{}'".format(service.name))
+
+    return struct(http=http_url, ws=ws_url)
+
+
+# Return the HTTP RPC URL of the sequencer or empty if it doesn't exist.
+def get_sequencer_rpc_url(plan, args):
+    if args.get("consensus_contract_type") not in [
+        constants.CONSENSUS_TYPE.rollup,
+        constants.CONSENSUS_TYPE.cdk_validium,
+    ]:
+        return ""
+
+    sequencer_service = plan.get_service(
+        args["sequencer_name"] + args["deployment_suffix"]
     )
-    return struct(
-        http="http://{}:{}".format(
-            l2_rpc_service.ip_address,
-            l2_rpc_service.ports["rpc"].number,
-        ),
-        ws="ws://{}:{}".format(
-            l2_rpc_service.ip_address,
-            l2_rpc_service.ports["ws-rpc"].number,
-        ),
+    sequencer_rpc_url = "http://{}:{}".format(
+        sequencer_service.ip_address, sequencer_service.ports["rpc"].number
     )
+
+    return sequencer_rpc_url
 
 
 def get_sovereign_contract_setup_addresses(plan, args):
@@ -81,8 +108,7 @@ def get_sovereign_contract_setup_addresses(plan, args):
         command=["/bin/sh", "-c", "cat /opt/zkevm-contracts/sovereign-rollup-out.json"],
         extract=extract,
     )
-    service_name = "contracts"
-    service_name += args["deployment_suffix"]
+    service_name = "contracts" + args["deployment_suffix"]
     result = plan.exec(
         description="Getting contract setup addresses from {} service".format(
             service_name
@@ -96,7 +122,7 @@ def get_sovereign_contract_setup_addresses(plan, args):
 def get_op_succinct_env_vars(plan, args):
     extract = {
         "op_succinct_agg_proof_mode": "fromjson | .AGG_PROOF_MODE",
-        "op_succinct_agglayer": "fromjson | .OP_SUCCINCT_AGGLAYER",
+        "op_succinct_agglayer": "fromjson | .AGGLAYER",
         "op_succinct_mock": "fromjson | .OP_SUCCINCT_MOCK",
         "sp1_challenger": "fromjson | .challenger",
         "sp1_finalization_period": "fromjson | .finalizationPeriod",
@@ -124,7 +150,7 @@ def get_op_succinct_env_vars(plan, args):
         command=["/bin/sh", "-c", "cat /opt/op-succinct/op-succinct-env-vars.json"],
         extract=extract,
     )
-    service_name = "op-succinct-contract-deployer" + args["deployment_suffix"]
+    service_name = "contracts" + args["deployment_suffix"]
     result = plan.exec(
         description="Getting op-succinct environment variables from {} service".format(
             service_name
@@ -203,8 +229,7 @@ def get_op_succinct_l2oo_config(plan, args):
         ],
         extract=extract,
     )
-    service_name = "op-succinct-contract-deployer"
-    service_name += args["deployment_suffix"]
+    service_name = "contracts" + args["deployment_suffix"]
     result = plan.exec(
         description="Reading the opsuccinctl2ooconfig JSON file from {} service".format(
             service_name
@@ -213,3 +238,33 @@ def get_op_succinct_l2oo_config(plan, args):
         recipe=exec_recipe,
     )
     return get_exec_recipe_result(result)
+
+
+def get_kurtosis_addresses(args):
+    zkevm_l2_sequencer_address = args["zkevm_l2_sequencer_address"]
+    zkevm_l2_aggregator_address = args["zkevm_l2_aggregator_address"]
+    zkevm_l2_claimtxmanager_address = args["zkevm_l2_claimtxmanager_address"]
+    zkevm_l2_timelock_address = args["zkevm_l2_timelock_address"]
+    zkevm_l2_admin_address = args["zkevm_l2_admin_address"]
+    zkevm_l2_loadtest_address = args["zkevm_l2_loadtest_address"]
+    zkevm_l2_agglayer_address = args["zkevm_l2_agglayer_address"]
+    zkevm_l2_dac_address = args["zkevm_l2_dac_address"]
+    zkevm_l2_proofsigner_address = args["zkevm_l2_proofsigner_address"]
+    zkevm_l2_l1testing_address = args["zkevm_l2_l1testing_address"]
+    zkevm_l2_aggoracle_address = args["zkevm_l2_aggoracle_address"]
+    zkevm_l2_sovereignadmin_address = args["zkevm_l2_sovereignadmin_address"]
+
+    return {
+        "zkevm_l2_sequencer_address": zkevm_l2_sequencer_address,
+        "zkevm_l2_aggregator_address": zkevm_l2_aggregator_address,
+        "zkevm_l2_claimtxmanager_address": zkevm_l2_claimtxmanager_address,
+        "zkevm_l2_timelock_address": zkevm_l2_timelock_address,
+        "zkevm_l2_admin_address": zkevm_l2_admin_address,
+        "zkevm_l2_loadtest_address": zkevm_l2_loadtest_address,
+        "zkevm_l2_agglayer_address": zkevm_l2_agglayer_address,
+        "zkevm_l2_dac_address": zkevm_l2_dac_address,
+        "zkevm_l2_proofsigner_address": zkevm_l2_proofsigner_address,
+        "zkevm_l2_l1testing_address": zkevm_l2_l1testing_address,
+        "zkevm_l2_aggoracle_address": zkevm_l2_aggoracle_address,
+        "zkevm_l2_sovereignadmin_address": zkevm_l2_sovereignadmin_address,
+    }
