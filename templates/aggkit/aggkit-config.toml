@@ -9,31 +9,42 @@
 # setup. The values here should work, but are necessarily meant for
 # production environments. DYOR
 # The below configs are the default mandatory parameters to be used.
+# ==============================================================================
 
 PathRWData = "{{.zkevm_path_rw_data}}"
-L1URL="{{.l1_rpc_url}}"
-L2URL="{{.op_el_rpc_url}}"
-AggLayerURL="{{.agglayer_grpc_url}}"
+L1URL = "{{.l1_rpc_url}}"
+{{- if .deploy_optimism_rollup }}
+L2URL = "{{.op_el_rpc_url}}"
+{{- else }}
+L2URL = "{{.l2_rpc_url}}"
+{{- end }}
 
-ForkId = 12
-ContractVersions = "banana"
-IsValidiumMode = false
+# Check if agglayer grpc or readrpc should be used for AggLayerURL
+{{- if eq .agglayer_endpoint "grpc" }}
+AggLayerURL = "{{.agglayer_grpc_url}}"
+{{- else }}
+AggLayerURL = "{{.agglayer_readrpc_url}}"
+{{- end }}
+
+AggchainProofURL= "{{.aggkit_prover_grpc_url_prefix}}{{.deployment_suffix}}:{{.aggkit_prover_grpc_port}}"
+
 NetworkID = {{.zkevm_rollup_id}}
 
-# This is the admin account for now
-L2Coinbase =  "{{.zkevm_l2_sovereignadmin_address}}"
+{{- if or .deploy_optimism_rollup (eq .consensus_contract_type "pessimistic") }}
+SequencerPrivateKeyPath = "/etc/aggkit/sequencer.keystore"
+SequencerPrivateKeyPassword  = "{{.zkevm_l2_keystore_password}}"
+{{- else }}
 SequencerPrivateKeyPath = ""
 SequencerPrivateKeyPassword  = ""
+{{- end}}
 
-AggregatorPrivateKeyPath = ""
-AggregatorPrivateKeyPassword  = ""
-SenderProofToL1Addr = ""
 polygonBridgeAddr = "{{.zkevm_bridge_address}}"
 
+{{- if .deploy_optimism_rollup }}
 RPCURL = "{{.op_el_rpc_url}}"
-WitnessURL = ""
+{{- end}}
 
-# These values can be overriden directly from genesis.json
+# These values can be overridden directly from genesis.json
 rollupCreationBlockNumber = "{{.zkevm_rollup_manager_block_number}}"
 rollupManagerCreationBlockNumber = "{{.zkevm_rollup_manager_block_number}}"
 genesisBlockNumber = "{{.zkevm_rollup_manager_block_number}}"
@@ -48,6 +59,11 @@ genesisBlockNumber = "{{.zkevm_rollup_manager_block_number}}"
 #
 # ------------------------------------------------------------------------------
 [L1Config]
+# ------------------------------------------------------------------------------
+# URL is the L1 network url
+# ------------------------------------------------------------------------------
+URL = "{{.l1_rpc_url}}"
+
 # ------------------------------------------------------------------------------
 # L1 chain id
 # ------------------------------------------------------------------------------
@@ -71,7 +87,11 @@ polTokenAddress = "{{.pol_token_address}}"
 # ------------------------------------------------------------------------------
 # Address of the sovereign rollup contract on L2
 # ------------------------------------------------------------------------------
+{{- if .deploy_optimism_rollup }}
 polygonZkEVMAddress = "{{.sovereign_rollup_addr}}"
+{{- else }}
+polygonZkEVMAddress = "{{.zkevm_rollup_address}}"
+{{- end }}
 
 # ==============================================================================
 #  _     ____   ____ ___  _   _ _____ ___ ____
@@ -85,7 +105,11 @@ polygonZkEVMAddress = "{{.sovereign_rollup_addr}}"
 # ------------------------------------------------------------------------------
 # Address of the sovereign global exit root proxy contract on L2
 # ------------------------------------------------------------------------------
+{{- if .deploy_optimism_rollup }}
 GlobalExitRootAddr = "{{.sovereign_ger_proxy_addr}}"
+{{- else }}
+GlobalExitRootAddr = "{{.zkevm_global_exit_root_l2_address}}"
+{{- end }}
 
 # ==============================================================================
 #  _     ___   ____
@@ -104,7 +128,7 @@ GlobalExitRootAddr = "{{.sovereign_ger_proxy_addr}}"
 # https://github.com/uber-go/zap/blob/a55bdc32f526699c3b4cc51a2cc97e944d02fbbf/config.go#L120
 # https://github.com/uber-go/zap/blob/a55bdc32f526699c3b4cc51a2cc97e944d02fbbf/config.go#L161
 # ------------------------------------------------------------------------------
-Environment = "development" # "production" or "development"
+Environment = "production" # "production" or "development"
 
 # ------------------------------------------------------------------------------
 # Level determines the log level that will be written to the
@@ -131,11 +155,24 @@ Outputs = ["stderr"]
 # ------------------------------------------------------------------------------
 [RPC]
 # ------------------------------------------------------------------------------
-# Port will configure the port that the data streamer server will
+# Port will configure the port that the JSON RPC server will listen on
+# ------------------------------------------------------------------------------
+Port = "{{.cdk_node_rpc_port}}"
+
+# ==============================================================================
+#  ____  _____ ____ _____
+# |  _ \| ____/ ___|_   _|
+# | |_) |  _| \___ \ | |
+# |  _ <| |___ ___) || |
+# |_| \_\_____|____/ |_|
+#
+# ------------------------------------------------------------------------------
+[REST]
+# ------------------------------------------------------------------------------
+# Port will configure the port that the REST API HTTP server will
 # listen on
 # ------------------------------------------------------------------------------
-Port = 5576
-
+Port = "{{.aggkit_node_rest_api_port}}"
 
 # ==============================================================================
 #     _    ____  ____ ____  _____ _   _ ____  _____ ____
@@ -154,15 +191,32 @@ Port = 5576
 # ------------------------------------------------------------------------------
 # AggsenderPrivateKey is the private key which is used to sign certificates
 # ------------------------------------------------------------------------------
-AggsenderPrivateKey = {Path = "/etc/aggkit/sovereignadmin.keystore", Password = "{{.zkevm_l2_keystore_password}}"}
-AggchainProofURL="{{.aggkit_prover_grpc_url}}"
+AggSenderPrivateKey = {Path = "/etc/aggkit/sequencer.keystore", Password = "{{.zkevm_l2_keystore_password}}"}
+
+{{- if eq .consensus_contract_type "pessimistic"}}
+Mode = "PessimisticProof"
+{{- else}}
+Mode = "AggchainProof"
+{{- end}}
 CheckStatusCertificateInterval = "1s"
 
-# {{if eq .consensus_contract_type "pessimistic"}}
-Mode="PessimisticProof"
-# {{else}}
-Mode="AggchainProof"
-# {{end}}
+# ------------------------------------------------------------------------------
+# MaxCertSize is the maximum size of the certificate
+# i.e (the emitted certificate cannot be bigger that this size)
+# 0 is infinite
+# ------------------------------------------------------------------------------
+# MaxCertSize = 0
+
+[AggSender.AggkitProverClient]
+UseTLS = false
+
+{{- if eq .consensus_contract_type "fep"}}
+[AggSender.OptimisticModeConfig]
+SovereignRollupAddr = "{{.sovereign_rollup_addr}}"
+TrustedSequencerKey = {Path = "/etc/aggkit/sequencer.keystore", Password = "{{.zkevm_l2_keystore_password}}"}
+OpNodeURL = "{{.op_cl_rpc_url}}"
+RequireKeyMatchTrustedSequencer = true
+{{- end}}
 
 [AggSender.MaxSubmitCertificateRate]
 NumRequests = 20
@@ -176,8 +230,9 @@ Interval = "1m"
 # ------------------------------------------------------------------------------
 # BlockFinality indicates which finality follows AggLayer accepted values are:
 # LatestBlock, SafeBlock, PendingBlock, FinalizedBlock, EarliestBlock
+# Default value is "LatestBlock"
 # ------------------------------------------------------------------------------
-# BlockFinality = "LatestBlock"
+BlockFinality = "LatestBlock"
 
 # ------------------------------------------------------------------------------
 # EpochNotificationPercentage indicates the percentage of the epoch
@@ -199,22 +254,15 @@ SaveCertificatesToFilesPath = "/tmp"
 # MaxRetriesStoreCertificate = 3
 
 # ------------------------------------------------------------------------------
-# DelayBeetweenRetries is the delay between retries
+# DelayBetweenRetries is the delay between retries
 # Duration expressed in units: [ns, us, ms, s, m, h, d]"
 # ------------------------------------------------------------------------------
-# DelayBeetweenRetries = 5s
+# DelayBetweenRetries = 5s
 
 # ------------------------------------------------------------------------------
 # KeepCertificatesHistory is a flag to keep the certificates history on storage
 # ------------------------------------------------------------------------------
 # KeepCertificatesHistory = false
-
-# ------------------------------------------------------------------------------
-# MaxCertSize is the maximum size of the certificate
-# i.e (the emitted certificate cannot be bigger that this size)
-# 0 is infinite
-# ------------------------------------------------------------------------------
-# MaxCertSize = 0
 
 # ------------------------------------------------------------------------------
 # BridgeMetadataAsHash is a flag to import the bridge metadata as hash
@@ -231,6 +279,36 @@ SaveCertificatesToFilesPath = "/tmp"
 # EnableRPC is a flag to enable the RPC for aggsender
 # ------------------------------------------------------------------------------
 # EnableRPC = false
+
+# ------------------------------------------------------------------------------
+# RetryCertAfterInError when a cert pass to 'InError'state
+# the AggSender will try to resend it immediately
+# ------------------------------------------------------------------------------
+# RetryCertAfterInError = false
+
+# ------------------------------------------------------------------------------
+# RequireNoFEPBlockGap is true if the AggSender should not accept a gap between
+# lastBlock from lastCertificate and first block of FEP
+# ------------------------------------------------------------------------------
+# RequireNoFEPBlockGap = false
+
+# ------------------------------------------------------------------------------
+# RequireOneBridgeInPPCertificate is a flag to force the AggSender to have at least one bridge exit
+# for the Pessimistic Proof certificates
+# ------------------------------------------------------------------------------
+# RequireOneBridgeInPPCertificate = false
+
+# ------------------------------------------------------------------------------
+# MaxL2BlockNumber is the last L2 block number that is going to be included in a certificate
+# 0 means disabled
+# ------------------------------------------------------------------------------
+# MaxL2BlockNumber = 0
+
+# ------------------------------------------------------------------------------
+# StopOnFinishedSendingAllCertificates is a flag to stop the AggSender when it finishes sending all certificates
+# up to MaxL2BlockNumber
+# ------------------------------------------------------------------------------
+# StopOnFinishedSendingAllCertificates = false
 
 # ==============================================================================
 #     _    ____  ____  ___  ____      _    ____ _     _____
@@ -252,12 +330,6 @@ SaveCertificatesToFilesPath = "/tmp"
 # URLRPCL1 = "{{.l1_rpc_url}}"
 
 # ------------------------------------------------------------------------------
-# BlockFinality indicates which finality follows AggLayer accepted values are:
-# LatestBlock, SafeBlock, PendingBlock, FinalizedBlock, EarliestBlock
-# ------------------------------------------------------------------------------
-# BlockFinality = "LatestBlock"
-
-# ------------------------------------------------------------------------------
 # Duration expressed in units: [ns, us, ms, s, m, h, d]"
 # ------------------------------------------------------------------------------
 WaitPeriodNextGER = "10s"
@@ -266,7 +338,11 @@ WaitPeriodNextGER = "10s"
 # ------------------------------------------------------------------------------
 # Address of the sovereign global exit root proxy contract on L2
 # ------------------------------------------------------------------------------
+{{- if .deploy_optimism_rollup }}
 GlobalExitRootL2 = "{{.sovereign_ger_proxy_addr}}"
+{{- else }}
+GlobalExitRootL2 = "{{.zkevm_global_exit_root_l2_address}}"
+{{- end }}
 
 # ------------------------------------------------------------------------------
 # URLRPCL2 is the URL of the L2 RPC node
@@ -294,7 +370,7 @@ PrivateKeys = [{Path = "/etc/aggkit/aggoracle.keystore", Password = "{{.zkevm_l2
 # FrequencyToMonitorTxs frequency of the resending failed txs
 # Duration expressed in units: [ns, us, ms, s, m, h, d]"
 # ------------------------------------------------------------------------------
-# FrequencyToMonitorTxs = "86400s"
+# FrequencyToMonitorTxs = "1s"
 
 # ------------------------------------------------------------------------------
 # WaitTxToBeMined time to wait after transaction was sent to the ethereum
@@ -355,7 +431,7 @@ PrivateKeys = [{Path = "/etc/aggkit/aggoracle.keystore", Password = "{{.zkevm_l2
 # ------------------------------------------------------------------------------
 # StoragePath is the path of the internal storage
 # ------------------------------------------------------------------------------
-# StoragePath = "{{.zkevm_path_rw_data}}ethtxmanager-aggoracle.sqlite"
+# StoragePath = "{{.zkevm_path_rw_data}}/ethtxmanager-aggoracle.sqlite"
 
 # ------------------------------------------------------------------------------
 # ReadPendingL1Txs is a flag to enable the reading of pending L1 txs
@@ -389,24 +465,32 @@ L1ChainID = "{{.zkevm_rollup_chain_id}}"
 # |  _ \| |_) || || | | | |  _|  _| | |     __) \___ \\ V /|  \| | |
 # | |_) |  _ < | || |_| | |_| | |___| |___ / __/ ___) || | | |\  | |___
 # |____/|_| \_\___|____/ \____|_____|_____|_____|____/ |_| |_| \_|\____|
-
 # ------------------------------------------------------------------------------
 [BridgeL2Sync]
 # ------------------------------------------------------------------------------
 # BridgeAddr is the address of the sovereign bridge contract on L2
 # ------------------------------------------------------------------------------
+{{- if .deploy_optimism_rollup }}
 BridgeAddr = "{{.sovereign_bridge_proxy_addr}}"
+{{- else }}
+BridgeAddr = "{{.zkevm_bridge_l2_address}}"
+{{- end }}
 
 # ------------------------------------------------------------------------------
 # DBPath path of the sqlite db
 # ------------------------------------------------------------------------------
-# DBPath = "{{.zkevm_path_rw_data}}bridgel2sync.sqlite"
+# DBPath = "{{.zkevm_path_rw_data}}/bridgel2sync.sqlite"
 
 # ------------------------------------------------------------------------------
 # BlockFinality indicates the status of the blocks that will be queried to sync
 # LatestBlock, SafeBlock, PendingBlock, FinalizedBlock, EarliestBlock
+# Default value is "LatestBlock"
 # ------------------------------------------------------------------------------
-# BlockFinality = "LatestBlock"
+{{- if .deploy_optimism_rollup }}
+BlockFinality = "FinalizedBlock"
+{{- else }}
+BlockFinality = "LatestBlock"
+{{- end }}
 
 # ------------------------------------------------------------------------------
 # First block that will be queried when starting the synchronization from scratch.
@@ -451,32 +535,51 @@ BridgeAddr = "{{.sovereign_bridge_proxy_addr}}"
 InitialBlock = "{{.zkevm_rollup_manager_block_number}}"
 
 # ==============================================================================
+#  _     ____   ____ _____ ____  ______   ___   _  ____ 
+# | |   |___ \ / ___| ____|  _ \/ ___\ \ / / \ | |/ ___|
+# | |     __) | |  _|  _| | |_) \___ \\ V /|  \| | |    
+# | |___ / __/| |_| | |___|  _ < ___) || | | |\  | |___ 
+# |_____|_____|\____|_____|_| \_\____/ |_| |_| \_|\____|
+# ==============================================================================
+[L2GERSync]
+# ------------------------------------------------------------------------------
+# BlockFinality indicates which finality follows AggLayer accepted values are:
+# LatestBlock, SafeBlock, PendingBlock, FinalizedBlock, EarliestBlock
+# Default value is "LatestBlock"
+# ------------------------------------------------------------------------------
+BlockFinality = "LatestBlock"
+
+# ==============================================================================
 #   ____ _        _    ___ __  __ ____  ____   ___  _   _ ____   ___  ____
 #  / ___| |      / \  |_ _|  \/  / ___||  _ \ / _ \| \ | / ___| / _ \|  _ \
 # | |   | |     / _ \  | || |\/| \___ \| |_) | | | |  \| \___ \| | | | |_) |
 # | |___| |___ / ___ \ | || |  | |___) |  __/| |_| | |\  |___) | |_| |  _ <
 #  \____|_____/_/   \_\___|_|  |_|____/|_|    \___/|_| \_|____/ \___/|_| \_\
-# ==============================================================================
+# ------------------------------------------------------------------------------
 [ClaimSponsor]
 # ------------------------------------------------------------------------------
 # Path of the DB
 # ------------------------------------------------------------------------------
-DBPath = "{{.zkevm_path_rw_data}}claimsponsor.sqlite"
+DBPath = "{{.zkevm_path_rw_data}}/claimsponsor.sqlite"
 
 # ------------------------------------------------------------------------------
 # Enabled indicates if the sponsor should be run or not
 # ------------------------------------------------------------------------------
-Enabled = false
+Enabled = "{{.enable_aggkit_claim_sponsor}}"
 
 # ------------------------------------------------------------------------------
 # SenderAddr is the address that will be used to send the claim txs
 # ------------------------------------------------------------------------------
-SenderAddr = "{{.zkevm_l2_claimtxmanager_address}}"
+SenderAddr = "{{.zkevm_l2_claimsponsor_address}}"
 
 # ------------------------------------------------------------------------------
 # BridgeAddrL2 is the address of the bridge smart contract on L2
 # ------------------------------------------------------------------------------
+{{- if .deploy_optimism_rollup }}
 BridgeAddrL2 = "{{.sovereign_bridge_proxy_addr}}"
+{{- else }}
+BridgeAddrL2 = "{{.zkevm_bridge_l2_address}}"
+{{- end }}
 
 [ClaimSponsor.EthTxManager]
 # ------------------------------------------------------------------------------
@@ -484,22 +587,87 @@ BridgeAddrL2 = "{{.sovereign_bridge_proxy_addr}}"
 # to be read in order to provide the private keys to sign the L1 txs
 # ------------------------------------------------------------------------------
 PrivateKeys = [
-    {Path = "/etc/aggkit/claimtxmanager.keystore", Password = "{{.zkevm_l2_keystore_password}}"},
+    {Path = "/etc/aggkit/claimsponsor.keystore", Password = "{{.zkevm_l2_keystore_password}}"},
 ]
 
 # ------------------------------------------------------------------------------
 # StoragePath is the path of the internal storage
 # ------------------------------------------------------------------------------
-StoragePath = "{{.zkevm_path_rw_data}}ethtxmanager-claimsponsor.sqlite"
+StoragePath = "{{.zkevm_path_rw_data}}/ethtxmanager-claimsponsor.sqlite"
 
 [ClaimSponsor.EthTxManager.Etherman]
 # ------------------------------------------------------------------------------
 # URL is the URL of the Ethereum node for L2
 # ------------------------------------------------------------------------------
+{{- if .deploy_optimism_rollup }}
 URL = "{{.op_el_rpc_url}}"
+{{- else }}
+URL= "{{.l2_rpc_url}}"
+{{- end }}
 
 # ------------------------------------------------------------------------------
 # Needs to be set to be the sovereign L2 chain id
 # If set to 0, the chain ID will be fetched from the RPC endpoint
 # ------------------------------------------------------------------------------
 L1ChainID = "{{.zkevm_rollup_chain_id}}"
+
+# ==============================================================================
+#                        _           _                              __
+#  __ _  __ _  __ _  ___| |__   __ _(_)_ __  _ __  _ __ ___   ___  / _| __ _  ___ _ __
+# / _` |/ _` |/ _` |/ __| '_ \ / _` | | '_ \| '_ \| '__/ _ \ / _ \| |_ / _` |/ _ \ '_ \
+#| (_| | (_| | (_| | (__| | | | (_| | | | | | |_) | | | (_) | (_) |  _| (_| |  __/ | | |
+# \__,_|\__, |\__, |\___|_| |_|\__,_|_|_| |_| .__/|_|  \___/ \___/|_|  \__, |\___|_| |_|
+#       |___/ |___/                         |_|                        |___/
+# ------------------------------------------------------------------------------
+[AggchainProofGen]
+# ------------------------------------------------------------------------------
+# SovereignRollupAddr is the address of the sovereign rollup contract on L1
+# ------------------------------------------------------------------------------
+{{- if .deploy_optimism_rollup }}
+SovereignRollupAddr = "{{.sovereign_rollup_addr}}"
+{{- else }}
+SovereignRollupAddr = "{{.zkevm_rollup_address}}"
+{{- end }}
+
+# ------------------------------------------------------------------------------
+# GlobalExitRootL2Addr is the address of the GlobalExitRootManager contract on l2 sovereign chain
+# this address is needed for the AggchainProof mode of the AggSender
+# ------------------------------------------------------------------------------
+{{- if .deploy_optimism_rollup }}
+GlobalExitRootL2 = "{{.sovereign_ger_proxy_addr}}"
+{{- else }}
+GlobalExitRootL2 = "{{.zkevm_global_exit_root_l2_address}}"
+{{- end }}
+
+[AggchainProofGen.AggkitProverClient]
+# ------------------------------------------------------------------------------
+# UseTLS is a flag to enable the AggkitProver TLS handshake in the AggSender-AggkitProver gRPC connection
+# ------------------------------------------------------------------------------
+# UseTLS = false
+
+# ==============================================================================
+#  ____             __ _ _ _
+# |  _ \ _ __ ___  / _(_) (_)_ __   __ _
+# | |_) | '__/ _ \| |_| | | | '_ \ / _` |
+# |  __/| | | (_) |  _| | | | | | | (_| |
+# |_|   |_|  \___/|_| |_|_|_|_| |_|\__, |
+#                                  |___/
+# ------------------------------------------------------------------------------
+[Profiling]
+# ------------------------------------------------------------------------------
+# ProfilingHost is the address to bind the profiling server
+# Default: "localhost"
+# ------------------------------------------------------------------------------
+ProfilingHost = "0.0.0.0"
+
+# ------------------------------------------------------------------------------
+# ProfilingPort is the port to bind the profiling server
+# Default: 6060
+# ------------------------------------------------------------------------------
+ProfilingPort = {{.aggkit_pprof_port}}
+
+# ------------------------------------------------------------------------------
+# ProfilingEnabled is the flag to enable/disable the profiling server
+# Default: false
+# ------------------------------------------------------------------------------
+ProfilingEnabled = {{.aggkit_pprof_enabled}}

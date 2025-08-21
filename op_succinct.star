@@ -1,72 +1,13 @@
 op_succinct_package = import_module("./lib/op_succinct.star")
 
 
-def op_succinct_contract_deployer_run(plan, args):
-    # Start the op-succinct contract deployer helper component.
-    op_succinct_contract_deployer_configs = (
-        op_succinct_package.create_op_succinct_contract_deployer_service_config(
-            plan, args
-        )
-    )
-
-    plan.add_services(
-        configs=op_succinct_contract_deployer_configs,
-        description="Starting the op-succinct contract deployer helper component",
-    )
-
-    service_name = "op-succinct-contract-deployer" + args["deployment_suffix"]
-    plan.exec(
-        description="Deploying op-succinct contracts",
-        service_name=service_name,
-        recipe=ExecRecipe(
-            command=[
-                "/bin/bash",
-                "-c",
-                "cp /opt/scripts/deploy-op-succinct-contracts.sh /opt/op-succinct/ && chmod +x {0} && {0}".format(
-                    "/opt/op-succinct/deploy-op-succinct-contracts.sh"
-                ),
-            ]
-        ),
-    )
-
-
-def op_succinct_server_run(plan, args, op_succinct_env_vars):
-    # Start the op-succinct-server component.
-    op_succinct_server_configs = (
-        op_succinct_package.create_op_succinct_server_service_config(
-            args, op_succinct_env_vars
-        )
-    )
-
-    plan.add_services(
-        configs=op_succinct_server_configs,
-        description="Starting the op-succinct-server component",
-    )
-
-
-def op_succinct_proposer_run(plan, args, op_succinct_env_vars):
+def op_succinct_proposer_run(plan, args):
     # FIXME... what is this point of this.. I think we can use a script to do this and we can avoid the weird hard coded chain id
     # echo 'CREATE TABLE `proof_requests` (`id` integer NOT NULL PRIMARY KEY AUTOINCREMENT, `type` text NOT NULL, `start_block` integer NOT NULL, `end_block` integer NOT NULL, `status` text NOT NULL, `request_added_time` integer NOT NULL, `prover_request_id` text NULL, `proof_request_time` integer NULL, `last_updated_time` integer NOT NULL, `l1_block_number` integer NULL, `l1_block_hash` text NULL, `proof` blob NULL);'  | sqlite3 foo.db
 
-    op_succinct_proposer_config_template = read_file(
-        src="./templates/op-succinct/db/"
-        + str(args["zkevm_rollup_chain_id"])
-        + "/proofs.db"
-    )
-    op_succinct_proposer_config_artifact = plan.render_templates(
-        name="op-succinct-proposer-config-artifact",
-        config={
-            "proofs.db": struct(
-                template=op_succinct_proposer_config_template, data=args
-            )
-        },
-    )
-
     # Start the op-succinct-proposer component.
     op_succinct_proposer_configs = (
-        op_succinct_package.create_op_succinct_proposer_service_config(
-            args, op_succinct_env_vars, op_succinct_proposer_config_artifact
-        )
+        op_succinct_package.create_op_succinct_proposer_service_config(args)
     )
 
     plan.add_services(
@@ -75,34 +16,83 @@ def op_succinct_proposer_run(plan, args, op_succinct_env_vars):
     )
 
 
-def sp1_verifier_contracts_deployer_run(plan, args):
-    service_name = "op-succinct-contract-deployer" + args["deployment_suffix"]
-    plan.exec(
-        description="Deploying SP1 Verifier Contracts for OP Succinct",
-        service_name=service_name,
-        recipe=ExecRecipe(
-            command=[
-                "/bin/bash",
-                "-c",
-                "cp /opt/scripts/deploy-sp1-verifier-contracts.sh /opt/op-succinct/ && chmod +x {0} && {0}".format(
-                    "/opt/op-succinct/deploy-sp1-verifier-contracts.sh"
-                ),
-            ]
-        ),
+def extract_fetch_rollup_config(plan, args):
+    # Add a temporary service using the op-succinct-proposer image
+    temp_service_name = "temp-op-succinct-proposer"
+
+    service_config = ServiceConfig(
+        image=args["op_succinct_proposer_image"],
+        cmd=["sleep", "infinity"],  # Keep container running
+    )
+
+    plan.run_sh(
+        run="echo copying fetch-rollup-config binary to files artifact...",
+        image=args.get("op_succinct_proposer_image"),
+        store=[
+            StoreSpec(
+                src="/usr/local/bin/fetch-rollup-config",
+                name="fetch-rollup-config",
+            )
+        ],
+        wait=None,
+        description="Extract fetch-rollup-config from the op-succinct-proposer image to files artifact",
     )
 
 
-def op_succinct_l2oo_deployer_run(plan, args):
-    service_name = "op-succinct-contract-deployer" + args["deployment_suffix"]
+def create_evm_sketch_genesis(plan, args):
+    parse_evm_sketch_genesis_artifact = plan.render_templates(
+        name="parse-evm-sketch-genesis.sh",
+        config={
+            "parse-evm-sketch-genesis.sh": struct(
+                template=read_file(
+                    src="./templates/op-succinct/parse-evm-sketch-genesis.sh"
+                ),
+                data=args,
+            ),
+        },
+        description="Create parse-evm-sketch-genesis.sh files artifact",
+    )
+
+    op_geth_genesis = plan.store_service_files(
+        service_name="op-el-1-op-geth-op-node" + args["deployment_suffix"],
+        name="op_geth_genesis.json",
+        src="/network-configs/genesis-" + str(args["zkevm_rollup_chain_id"]) + ".json",
+        description="Storing OP Geth genesis.json for evm-sketch-genesis field in aggkit-prover.",
+    )
+
+    # Add a temporary service using the contracts image
+    temp_service_name = "temp-contracts"
+
+    files = {}
+    files["/opt/op-succinct/"] = Directory(artifact_names=[op_geth_genesis])
+
+    files["/opt/scripts/"] = Directory(
+        artifact_names=[parse_evm_sketch_genesis_artifact]
+    )
+
+    # Create helper service to deploy contracts
+    plan.add_service(
+        name=temp_service_name,
+        config=ServiceConfig(
+            image=args["agglayer_contracts_image"],
+            files=files,
+            # These two lines are only necessary to deploy to any Kubernetes environment (e.g. GKE).
+            entrypoint=["bash", "-c"],
+            cmd=["sleep infinity"],
+            user=User(uid=0, gid=0),  # Run the container as root user.
+        ),
+    )
+
+    # Parse .config section of L1 geth genesis for evm-sketch-genesis input
     plan.exec(
-        description="Deploying L2OO Contract",
-        service_name=service_name,
+        description="Parsing .config section of L1 geth genesis for evm-sketch-genesis input",
+        service_name="temp-contracts",
         recipe=ExecRecipe(
             command=[
                 "/bin/bash",
                 "-c",
-                "cp /opt/scripts/deploy-l2oo.sh /opt/op-succinct/ && chmod +x {0} && {0}".format(
-                    "/opt/op-succinct/deploy-l2oo.sh"
+                "cp /opt/scripts/parse-evm-sketch-genesis.sh /opt/op-succinct/ && chmod +x {0} && {0}".format(
+                    "/opt/op-succinct/parse-evm-sketch-genesis.sh"
                 ),
             ]
         ),

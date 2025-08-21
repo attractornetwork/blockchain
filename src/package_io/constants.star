@@ -7,6 +7,7 @@ ADDITIONAL_SERVICES = struct(
     erpc="erpc",
     observability="observability",
     pless_zkevm_node="pless_zkevm_node",
+    rpc_fuzzer="rpc_fuzzer",
     status_checker="status_checker",
     test_runner="test_runner",
     tx_spammer="tx_spammer",
@@ -22,7 +23,7 @@ LOG_LEVEL = struct(
 
 CONSENSUS_TYPE = struct(
     rollup="rollup",
-    cdk_validium="cdk-validium",
+    cdk_validium="cdk_validium",
     pessimistic="pessimistic",
     ecdsa="ecdsa",
     fep="fep",
@@ -33,12 +34,11 @@ SEQUENCER_TYPE = struct(
     ZKEVM="zkevm",
 )
 
-TOOLBOX_IMAGE = "leovct/toolbox:0.0.8"
+TOOLBOX_IMAGE = (
+    "europe-west2-docker.pkg.dev/prj-polygonlabs-devtools-dev/public/toolbox:0.0.10"
+)
 
 L1_ENGINES = ("geth", "anvil")
 
 # Standard zero address in Ethereum.
 ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
-
-# 256-bit zero hash.
-ZERO_HASH = "0x0000000000000000000000000000000000000000000000000000000000000000"

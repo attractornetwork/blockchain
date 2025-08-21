@@ -1,0 +1,334 @@
+name: nightly
+
+on:
+  schedule:
+    - cron: 0 6 * * * # Run this workflow every day at 6 AM Paris time (UTC+2).
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+  id-token: write
+
+env:
+  ENCLAVE_NAME: cdk
+
+jobs:
+  check-version-matrix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: 3.13
+
+      - name: Install dependencies
+        run: pip install -r scripts/version-matrix/requirements.txt
+
+      - name: Generate version matrix
+        run: python scripts/version-matrix/extract-versions.py
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN_READ }}
+
+      - name: Generate markdown documentation
+        run: python scripts/version-matrix/generate-markdown.py
+
+      - name: Check if there are changes
+        run: |
+          if [[ -n $(git status --porcelain) ]]; then
+            echo "::warning title=version-matrix::Version matrix is not up to date. Check the documentation at scripts/version-matrix to update it."
+            git status --porcelain
+            git diff
+          else
+            echo "✅ Version matrix is up to date."
+          fi
+
+  run-without-args:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Pre kurtosis run
+        uses: ./.github/actions/kurtosis-pre-run
+        with:
+          docker_username: ${{ secrets.DOCKER_USERNAME }}
+          docker_token: ${{ secrets.DOCKER_TOKEN }}
+          pull_images_from_gcr: "false"
+
+      - name: Kurtosis run
+        run: kurtosis run --enclave=${{ env.ENCLAVE_NAME }} .
+
+      - name: Inspect enclave
+        run: kurtosis enclave inspect ${{ env.ENCLAVE_NAME }}
+
+      - name: Run bridge tests
+        run: |
+          kurtosis service stop ${{ env.ENCLAVE_NAME }} bridge-spammer-001
+          kurtosis service exec ${{ env.ENCLAVE_NAME }} test-runner "export CLAIM_WAIT_DURATION=20m && bats --filter 'bridge native ETH from L1 to L2' tests/agglayer/bridges.bats"
+          kurtosis service exec ${{ env.ENCLAVE_NAME }} test-runner "export CLAIM_WAIT_DURATION=20m && bats --filter 'bridge native ETH from L2 to L1' tests/agglayer/bridges.bats"
+          kurtosis service start ${{ env.ENCLAVE_NAME }} bridge-spammer-001
+
+      - name: Check for error logs in aggkit service
+        working-directory: .github/scripts
+        run: |
+          LOGS=$(kurtosis service logs ${{ env.ENCLAVE_NAME }} aggkit-001 2>&1)
+          echo "$LOGS"
+          if [[ -z "$LOGS" ]]; then
+            echo "Error: No logs found for aggkit service! Service may not be functioning."
+            exit 1  # Fail the workflow if logs are empty
+          elif echo "$LOGS" | grep "ERRO\|FATA\|panic"; then
+            echo "Critical errors found in container logs!"
+            exit 1  # Fail the workflow if errors are found
+          else
+            echo "No errors found in logs."
+          fi
+
+      - name: Check for error logs in agglayer service
+        working-directory: .github/scripts
+        run: |
+          LOGS=$(kurtosis service logs ${{ env.ENCLAVE_NAME }} agglayer 2>&1)
+          echo "$LOGS"
+          if [[ -z "$LOGS" ]]; then
+            echo "Error: No logs found for agglayer service! Service may not be functioning."
+            exit 1  # Fail the workflow if logs are empty
+          elif echo "$LOGS" | grep -i "error\|exception\|failed\|fatal"; then
+            echo "Errors found in container logs!"
+            exit 1  # Fail the workflow if errors are found
+          else
+            echo "No errors found in logs."
+          fi
+
+      - name: Post kurtosis run
+        if: always()
+        uses: ./.github/actions/kurtosis-post-run
+        with:
+          enclave_name: ${{ env.ENCLAVE_NAME }}
+
+  list-ymls:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate test combinations
+        working-directory: .github/tests
+        run: ./combine-ymls.sh
+
+      - id: set-matrix
+        run: |
+          # Only run a subset of the tests in CI.
+          file_paths=$(ls -R ./.github/tests/combinations/*.yml ./.github/tests/nightly/op-rollup/op-default.yml)
+
+          file_paths=$(ls -R ./.github/tests/combinations/*.yml ./.github/tests/nightly/**/*.yml | grep -Ev "sovereign|gas-token|pless-zkevm-node")
+          matrix=$(echo "${file_paths}" | while read -r file_path; do
+            file_name=$(basename -s ".yml" "$file_path")
+            echo "{\"name\": \"$file_name\", \"path\": \"$file_path\"}"
+          done | jq -s -c '.')
+          echo "matrix=${matrix}" >> $GITHUB_OUTPUT
+
+  run-with-args:
+    needs: list-ymls
+    name: run-with-${{ matrix.file.name }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        file: ${{ fromJson(needs.list-ymls.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Pre kurtosis run
+        uses: ./.github/actions/kurtosis-pre-run
+        with:
+          docker_username: ${{ secrets.DOCKER_USERNAME }}
+          docker_token: ${{ secrets.DOCKER_TOKEN }}
+
+      - name: Kurtosis run
+        run: |
+          # Add test runner and tx spammer to the args file.
+          yq --in-place --yaml-roundtrip '.args.additional_services += ["test_runner"]' ${{ matrix.file.path }}
+          kurtosis run --enclave=${{ env.ENCLAVE_NAME }} --args-file=${{ matrix.file.path }} .
+
+      - name: Inspect enclave
+        run: kurtosis enclave inspect ${{ env.ENCLAVE_NAME }}
+
+      - name: Monitor CDK chain verified batches (Central RPC)
+        run: |
+          result=$(yq --raw-output '.args.consensus_contract_type' ${{ matrix.file.path }})
+          if [[ "$result" == "pessimistic" ]]; then
+            echo "Skipping block verification as consensus is pessimistic."
+          else
+            sequencer_type=$(yq --raw-output '.args.sequencer_type' ${{ matrix.file.path }})
+            rpc_name=""
+            if [[ "$sequencer_type" == "erigon" ]]; then
+              rpc_name="cdk-erigon-rpc-001"
+            elif [[ "$sequencer_type" == "zkevm" ]]; then
+              rpc_name="zkevm-node-rpc-001"
+            elif [[ "$sequencer_type" == "null" ]]; then
+              rpc_name="cdk-erigon-rpc-001"
+            else
+              echo "Unknown sequencer type: $sequencer_type"
+              exit 1
+            fi
+            echo "RPC name: $rpc_name"
+            ./.github/scripts/monitor-cdk-chain.sh \
+              --enclave ${{ env.ENCLAVE_NAME }} \
+              --rpc-url $(kurtosis port print ${{ env.ENCLAVE_NAME }} $rpc_name rpc)
+          fi
+
+      - name: Monitor CDK chain verified batches (zkEVM Permissionless RPC)
+        run: |
+          result=$(yq --raw-output '.args.consensus_contract_type' ${{ matrix.file.path }})
+          if [[ "$result" == "pessimistic" ]]; then
+            echo "Skipping block verification as consensus is pessimistic."
+          else
+            result=$(yq --raw-output '.args.additional_services // [] | contains(["pless_zkevm_node"])' ${{ matrix.file.path }})
+            if [[ "$result" == "true" ]]; then
+              ./.github/scripts/monitor-cdk-chain.sh \
+                --enclave ${{ env.ENCLAVE_NAME }} \
+                --rpc-url $(kurtosis port print ${{ env.ENCLAVE_NAME }} zkevm-node-rpc-pless-001 rpc)
+            else
+              echo "Skipping batch verification as there is no zkevm permissionless RPC in the environment"
+            fi
+          fi
+
+      - name: Monitor OP rollup finalized blocks (OP CL RPC)
+        run: |
+          result=$(yq --raw-output '.deployment_stages.deploy_optimism_rollup' ${{ matrix.file.path }})
+          if [[ "$result" == "true" ]]; then
+            ./.github/scripts/monitor-op-rollup.sh \
+              --enclave ${{ env.ENCLAVE_NAME }} \
+              --cl-rpc-url $(kurtosis port print ${{ env.ENCLAVE_NAME }} op-cl-1-op-node-op-geth-001 http)
+          else
+            echo "Skipping block verification as there is no OP rollup in the environment"
+          fi
+
+      - name: Run bridge tests
+        run: |
+          kurtosis service exec ${{ env.ENCLAVE_NAME }} test-runner "bats --filter 'bridge native ETH from L1 to L2' tests/agglayer/bridges.bats"
+          kurtosis service exec ${{ env.ENCLAVE_NAME }} test-runner "bats --filter 'bridge native ETH from L2 to L1' tests/agglayer/bridges.bats"
+
+      - name: Post kurtosis run
+        if: always()
+        uses: ./.github/actions/kurtosis-post-run
+        with:
+          enclave_name: ${{ env.ENCLAVE_NAME }}
+          args_filename: ${{ matrix.file.name }}
+
+  pre-deployed-gas-token:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Pre kurtosis run
+        uses: ./.github/actions/kurtosis-pre-run
+        with:
+          docker_username: ${{ secrets.DOCKER_USERNAME }}
+          docker_token: ${{ secrets.DOCKER_TOKEN }}
+
+      - name: Deploy L1 chain
+        run: kurtosis run --enclave=${{ env.ENCLAVE_NAME }} --args-file=./.github/tests/external-l1/deploy-local-l1.yml .
+
+      - name: Deploy gas token on L1
+        run: |
+          agglayer_contracts_version="v8.0.0-rc.4-fork.12"
+          echo "Cloning zkevm-contracts $agglayer_contracts_version..."
+          git clone https://github.com/0xPolygonHermez/zkevm-contracts
+          pushd zkevm-contracts
+          git checkout $agglayer_contracts_version
+          npm install @openzeppelin/contracts@4.8.2
+          printf "[profile.default]\nsrc = 'contracts'\nout = 'out'\nlibs = ['node_modules']\n" > foundry.toml
+
+          echo "Deploying gas token to L1..."
+          l1_rpc_url=$(kurtosis port print ${{ env.ENCLAVE_NAME }} el-1-geth-lighthouse rpc)
+          forge create \
+            --broadcast \
+            --json \
+            --rpc-url $l1_rpc_url \
+            --mnemonic "giant issue aisle success illegal bike spike question tent bar rely arctic volcano long crawl hungry vocal artwork sniff fantasy very lucky have athlete" \
+            contracts/mocks/ERC20PermitMock.sol:ERC20PermitMock \
+            --constructor-args "CDK Gas Token" "CDK" "0xE34aaF64b29273B7D567FCFc40544c014EEe9970" "1000000000000000000000000" \
+            > gasToken-erc20.json
+          gas_token_address=$(jq --raw-output '.deployedTo' gasToken-erc20.json)
+          if [[ -z "$gas_token_address" || "$gas_token_address" == "null" ]]; then
+            echo "Unable to deploy gas token"
+            exit 1
+          fi
+          echo "Gas token contract deployed at $gas_token_address on L1"
+          popd
+          yq -Y --in-place ".args.gas_token_address = \"$gas_token_address\"" ./.github/tests/nightly/gas-token/pre-deployed.yml
+
+      - name: Deploy the rest of the stack
+        run: |
+          # Add test runner and tx spammer to the args file.
+          yq --in-place --yaml-roundtrip '.args.additional_services += ["test_runner"]' .github/tests/nightly/gas-token/pre-deployed.yml
+          kurtosis run --enclave=${{ env.ENCLAVE_NAME }} --args-file=./.github/tests/nightly/gas-token/pre-deployed.yml .
+
+      - name: Inspect enclave
+        run: kurtosis enclave inspect ${{ env.ENCLAVE_NAME }}
+
+      - name: Monitor CDK chain verified batches (CDK Erigon Permissionless RPC)
+        working-directory: .github/scripts
+        run: |
+          ./monitor-cdk-chain.sh \
+            --enclave ${{ env.ENCLAVE_NAME }} \
+            --rpc-url "$(kurtosis port print ${{ env.ENCLAVE_NAME }} cdk-erigon-rpc-001 rpc)"
+
+      - name: Run bridge tests
+        run: |
+          kurtosis service exec ${{ env.ENCLAVE_NAME }} test-runner "bats --filter 'bridge native ETH from L1 to L2' tests/agglayer/bridges.bats"
+          kurtosis service exec ${{ env.ENCLAVE_NAME }} test-runner "bats --filter 'bridge native ETH from L2 to L1' tests/agglayer/bridges.bats"
+
+      - name: Post kurtosis run
+        if: always()
+        uses: ./.github/actions/kurtosis-post-run
+        with:
+          enclave_name: ${{ env.ENCLAVE_NAME }}
+          args_filename: pre-deployed-gas-token
+
+  # Deploy a standalone zkevm permisionless node against Cardona Sepolia Tesnet.
+  # cardona-sepolia-testnet-pless-zkevm-node:
+  #   runs-on: ubuntu-latest
+  #   timeout-minutes: 20
+  #   steps:
+  #     - uses: actions/checkout@v4
+
+  #     - name: Pre kurtosis run
+  #       uses: ./.github/actions/kurtosis-pre-run
+  #       with:
+  #         docker_username: ${{ secrets.DOCKER_USERNAME }}
+  #         docker_token: ${{ secrets.DOCKER_TOKEN }}
+
+  #     - name: Deploy the permisionless node
+  #       run: |
+  #         yq -Y --in-place '.args.l1_rpc_url = "${{ secrets.ALCHEMY_SEPOLIA_RPC_URL }}"' ./.github/tests/nightly/pless-zkevm-node/cardona-sepolia-testnet-pless-zkevm-node.yml
+  #         kurtosis run --enclave=${{ env.ENCLAVE_NAME }} --args-file=./.github/tests/nightly/pless-zkevm-node/cardona-sepolia-testnet-pless-zkevm-node.yml .
+  #       # This step will only execute if the necessary secrets are available, preventing failures
+  #       # on pull requests from forked repositories.
+  #       if: ${{ env.ALCHEMY_SEPOLIA_RPC_URL}}
+  #       env:
+  #         ALCHEMY_SEPOLIA_RPC_URL: ${{ secrets.ALCHEMY_SEPOLIA_RPC_URL }}
+
+  #     - name: Inspect enclave
+  #       run: kurtosis enclave inspect ${{ env.ENCLAVE_NAME }}
+
+  #     - name: Monitor CDK chain verified batches (zkEVM Node Permissionless RPC)
+  #       working-directory: .github/scripts
+  #       run: |
+  #         ./monitor-cdk-chain.sh \
+  #           --enclave ${{ env.ENCLAVE_NAME }} \
+  #           --rpc-url "$(kurtosis port print ${{ env.ENCLAVE_NAME }} zkevm-node-rpc-pless-001 rpc)"
+
+  #     - name: Post kurtosis run
+  #       if: always()
+  #       uses: ./.github/actions/kurtosis-post-run
+  #       with:
+  #         enclave_name: ${{ env.ENCLAVE_NAME }}
+  #         args_filename: cardona-sepolia-testnet-pless-zkevm-node

@@ -136,7 +136,7 @@ Url = ""
 # | ____|_   _| | | |_   _\ \/ /  \/  |  / \  | \ | |  / \  / ___| ____|  _ \
 # |  _|   | | | |_| | | |  \  /| |\/| | / _ \ |  \| | / _ \| |  _|  _| | |_) |
 # | |___  | | |  _  | | |  /  \| |  | |/ ___ \| |\  |/ ___ \ |_| | |___|  _ <
-# |_____| |_| |_| |_|_____|_| \_\_|  |_/_/   \_\_| \_/_/   \_\____|_____|_| \_\
+# |_____| |_| |_| |_| |_| /_/\_\_|  |_/_/   \_\_| \_/_/   \_\____|_____|_| \_\
 #
 # ------------------------------------------------------------------------------
 [EthTxManager]
@@ -151,7 +151,7 @@ Url = ""
 # Setting this duration can potentially create a lot of logs
 # especially if there is nothing to do.
 # ------------------------------------------------------------------------------
-FrequencyToMonitorTxs = "86400s"
+FrequencyToMonitorTxs = "5s"
 
 # ------------------------------------------------------------------------------
 # WaitTxToBeMined will determine how long we'll wait for a transaction
@@ -162,7 +162,7 @@ FrequencyToMonitorTxs = "86400s"
 # The code for sending transactions does not create a goroutine. It
 # will block for the duration of the wait.
 # ------------------------------------------------------------------------------
-WaitTxToBeMined = "12h"
+WaitTxToBeMined = "4m0s"
 
 # ------------------------------------------------------------------------------
 # ForcedGas can be used to configure a default gas limit to use in the
@@ -234,7 +234,7 @@ IntervalToRefreshBlockedAddresses = "5m"
 # probably be in line with the configured frequency for the
 # L2GaspriceSuggester's update period
 # ------------------------------------------------------------------------------
-IntervalToRefreshGasPrices = "3600s"
+IntervalToRefreshGasPrices = "10s"
 
 # ------------------------------------------------------------------------------
 # MaxTxBytesSize configures the RPC limit for the max size of a
@@ -265,7 +265,7 @@ DefaultMinGasPriceAllowed = 1000000000
 # interval is very long. If we want to be more reactive to the L1 gas
 # price, this can be configured for a shorter duration.
 # ------------------------------------------------------------------------------
-MinAllowedGasPriceInterval = "600m"
+MinAllowedGasPriceInterval = "5m"
 
 # ------------------------------------------------------------------------------
 # PollMinAllowedGasPriceInterval works in tandem with
@@ -275,7 +275,7 @@ MinAllowedGasPriceInterval = "600m"
 # price. We'll then update the current suggested gas price in our pool
 # with that value.
 # ------------------------------------------------------------------------------
-PollMinAllowedGasPriceInterval = "3600s"
+PollMinAllowedGasPriceInterval = "15s"
 
 # ------------------------------------------------------------------------------
 # AccountQueue determines how many non-executable transactions can be
@@ -350,6 +350,9 @@ MaxConns = 20
 # Enabled will determine if we use the effective gas price logic. The
 # details of this feature are a bit complicated but at a high level it
 # allows for additional gas savings to be passed on the user.
+#
+# https://github.com/0xPolygonHermez/zkevm-rom/issues/316
+# https://polygon.technology/blog/polygon-zkevm-effective-gas-price-live-on-mainnet-beta
 # ------------------------------------------------------------------------------
 Enabled = true
 
@@ -523,11 +526,11 @@ L2Coinbase = "0x0000000000000000000000000000000000000000"
 MaxLogsCount = 1000
 
 # ------------------------------------------------------------------------------
-# MaxLogsBlockRange MaxLogsBlockRange is a configuration to set the
+# MaxLogsBlockRange is a configuration to set the
 # max range for block number when querying TXslogs in a single call to
 # the state, if zero it means no limit
 # ------------------------------------------------------------------------------
-MaxLogsBlockRange = 10
+MaxLogsBlockRange = 1000
 
 # ------------------------------------------------------------------------------
 # MaxNativeBlockHashBlockRange is a configuration to set the max range
@@ -643,15 +646,15 @@ MaxSHA256Hashes = 0
 # SyncInterval defines the wait duration between reading new
 # information from the trusted sequencer, DAC, L1. Specifically, this
 # controls how long we wait between running sync operations and not
-# the frequence of syncs.
+# the frequency of syncs.
 # ------------------------------------------------------------------------------
-SyncInterval = "86400s"
+SyncInterval = "1s"
 
 # ------------------------------------------------------------------------------
 # SyncChunkSize determines how large of a range of blocks we'll
 # attempt to pull while getting the rollup information.
 # ------------------------------------------------------------------------------
-SyncChunkSize = 1000
+SyncChunkSize = 100
 
 # ------------------------------------------------------------------------------
 # TrustedSequencerURL is the RPC url to connect to in order to sync
@@ -669,11 +672,11 @@ TrustedSequencerURL = ""
 # https://www.alchemy.com/overviews/ethereum-commitment-levels
 #
 # This value is configured for latest to speed up testing in the local
-# environment but this is not recommened for production environments
+# environment but this is not recommended for production environments
 # ------------------------------------------------------------------------------
-SyncBlockProtection = "safe"
+# SyncBlockProtection = "safe"
 # SyncBlockProtection = "finalized"
-# SyncBlockProtection = "latest"
+SyncBlockProtection = "latest"
 
 # ------------------------------------------------------------------------------
 # L1SyncCheckL2BlockHash will perform additional hash checks between a
@@ -681,7 +684,7 @@ SyncBlockProtection = "safe"
 # add some additional querying and checking, but would help make it
 # clear if for any reason the node drifts from the trusted state.
 # ------------------------------------------------------------------------------
-L1SyncCheckL2BlockHash = false
+L1SyncCheckL2BlockHash = true
 
 # ------------------------------------------------------------------------------
 # L1SyncCheckL2BlockNumberhModulus sets a modulus in order to
@@ -689,7 +692,7 @@ L1SyncCheckL2BlockHash = false
 # L1SyncCheckL2BlockHash is also enabled. E.g. if this value is set to
 # 30, we'll trigger the checks every 30th L2 block.
 # ------------------------------------------------------------------------------
-L1SyncCheckL2BlockNumberhModulus = 100000
+L1SyncCheckL2BlockNumberhModulus = 30
 
 # ------------------------------------------------------------------------------
 # L1SynchronizationMode determines which mode of synchronization we
@@ -705,7 +708,7 @@ L1SynchronizationMode = "sequential"
 # MaxClients determines how many workers we'll spawn in order to read
 # L1 data and synchronize.
 # ------------------------------------------------------------------------------
-MaxClients = 1
+MaxClients = 10
 
 # ------------------------------------------------------------------------------
 # MaxPendingNoProcessedBlocks determines the size of the buffer used
@@ -713,43 +716,43 @@ MaxClients = 1
 # equal to the MaxClients number. The suggested configuration is at 2x
 # the number of MaxClients.
 # ------------------------------------------------------------------------------
-MaxPendingNoProcessedBlocks = 2
+MaxPendingNoProcessedBlocks = 25
 
 # ------------------------------------------------------------------------------
 # RequestLastBlockPeriod determines how long we'll wait to request a
 # new block from L1 assuming that we're already in sync.
 # ------------------------------------------------------------------------------
-RequestLastBlockPeriod = "86400s"
+RequestLastBlockPeriod = "5s"
 
 # ------------------------------------------------------------------------------
 # RequestLastBlockTimeout determines a maximum duration that we'll
 # wait for a response when requesting a new block.
 # ------------------------------------------------------------------------------
-RequestLastBlockTimeout = "21600s"
+RequestLastBlockTimeout = "5s"
 
 # ------------------------------------------------------------------------------
 # RequestLastBlockMaxRetries can be used to define the max number of
 # retries to request the L1 block
 # ------------------------------------------------------------------------------
-RequestLastBlockMaxRetries = 1
+RequestLastBlockMaxRetries = 3
 
 # ------------------------------------------------------------------------------
 # StatisticsPeriod defines how often we should show a log with
 # stats. Set this to 0 in order to disable all together.
 # ------------------------------------------------------------------------------
-StatisticsPeriod = "12h"
+StatisticsPeriod = "5m0s"
 
 # ------------------------------------------------------------------------------
 # TimeOutMainLoop determines how long we'll wait for the main
 # synchronizer loop to complete
 # ------------------------------------------------------------------------------
-TimeOutMainLoop = "12h"
+TimeOutMainLoop = "5m0s"
 
 # ------------------------------------------------------------------------------
 # RollupInfoRetriesSpacing determines the duration that we'll wait
 # between successive retries to fetch L1 data.
 # ------------------------------------------------------------------------------
-RollupInfoRetriesSpacing = "21600s"
+RollupInfoRetriesSpacing = "5s"
 
 # ------------------------------------------------------------------------------
 # FallbackToSequentialModeOnSynchronized if true the synchronizer will
@@ -766,7 +769,7 @@ FallbackToSequentialModeOnSynchronized = false
 # much as possible, so if the producer is not fast enough then you
 # could increase the number of parallel clients to sync with L1
 # ------------------------------------------------------------------------------
-AceptableInacctivityTime = "1800s"
+AceptableInacctivityTime = "5s"
 
 # ------------------------------------------------------------------------------
 # ApplyAfterNumRollupReceived configures a minimum number of processed
@@ -796,9 +799,8 @@ ReprocessFullBatchOnClose = false
 CheckLastL2BlockHashOnCloseBatch = true
 
 # TODO - use the defaults for now
-[Synchronizer.L1BlockCheck]
-Enabled = false
-
+# [Synchronizer.L1BlockCheck]
+# Enabled = true
 # L1SafeBlockPoint = "latest"
 # L1SafeBlockOffset = 0
 # ForceCheckBeforeStart = true
@@ -835,7 +837,7 @@ DeletePoolTxsCheckInterval = "12h0m0s"
 # TxLifetimeCheckInterval determines how often we'll check the current
 # txs in the pool to see if they have exceeded their lifetime
 # ------------------------------------------------------------------------------
-TxLifetimeCheckInterval = "1000m0s"
+TxLifetimeCheckInterval = "10m0s"
 
 # ------------------------------------------------------------------------------
 # TxLifetimeMax determines how long a non-executable transaction can
@@ -847,7 +849,7 @@ TxLifetimeMax = "3h0m0s"
 # LoadPoolTxsCheckInterval determines how frequently the sequencer
 # will check to see if there are new transactions in the pool
 # ------------------------------------------------------------------------------
-LoadPoolTxsCheckInterval = "3600s"
+LoadPoolTxsCheckInterval = "500ms"
 
 # ------------------------------------------------------------------------------
 # StateConsistencyCheckInterval determines how long the sequencer will
@@ -857,7 +859,7 @@ LoadPoolTxsCheckInterval = "3600s"
 # inconsistency develops, the finalizer will halt requiring a cleanup
 # / restart.
 # ------------------------------------------------------------------------------
-StateConsistencyCheckInterval = "3600s"
+StateConsistencyCheckInterval = "5s"
 
 [Sequencer.Finalizer]
 
@@ -865,13 +867,13 @@ StateConsistencyCheckInterval = "3600s"
 # ForcedBatchesTimeout is the time the finalizer waits after receiving
 # the closing signal to process forced batches.
 # ------------------------------------------------------------------------------
-ForcedBatchesTimeout = "64m0s"
+ForcedBatchesTimeout = "1m0s"
 
 # ------------------------------------------------------------------------------
 # NewTxsWaitInterval is the duration the finalizer will sleep between
 # iterations if there are no pending transactions to be processed.
 # ------------------------------------------------------------------------------
-NewTxsWaitInterval = "3600s"
+NewTxsWaitInterval = "100ms"
 
 # ------------------------------------------------------------------------------
 # ResourceExhaustedMarginPct is used to determine how much wiggle room
@@ -890,31 +892,31 @@ ResourceExhaustedMarginPct = 10
 # ForcedBatchesL1BlockConfirmations is used to determine finality for
 # processing of forced batches.
 # ------------------------------------------------------------------------------
-ForcedBatchesL1BlockConfirmations = 640
+ForcedBatchesL1BlockConfirmations = 64
 
 # ------------------------------------------------------------------------------
 # L1InfoTreeL1BlockConfirmations is used to determine finality for
 # processing of deposits to the l1 info tree
 # ------------------------------------------------------------------------------
-L1InfoTreeL1BlockConfirmations = 640
+L1InfoTreeL1BlockConfirmations = 64
 
 # ------------------------------------------------------------------------------
 # ForcedBatchesCheckInterval is the duration that the application will
 # sleep between checks for forced batches on L1
 # ------------------------------------------------------------------------------
-ForcedBatchesCheckInterval = "21600s"
+ForcedBatchesCheckInterval = "30s"
 
 # ------------------------------------------------------------------------------
 # L1InfoTreeCheckInterval is the duration that the application will
 # sleep between checks for updates to the L1 info tree
 # ------------------------------------------------------------------------------
-L1InfoTreeCheckInterval = "21600s"
+L1InfoTreeCheckInterval = "10s"
 
 # ------------------------------------------------------------------------------
 # BatchMaxDeltaTimestamp determines the max amount of time that a
 # batch will be held open assuming it's not empty.
 # ------------------------------------------------------------------------------
-BatchMaxDeltaTimestamp = "720h"
+BatchMaxDeltaTimestamp = "5s"
 
 # ------------------------------------------------------------------------------
 # L2BlockMaxDeltaTimestamp is used to set the L2 block interval.
@@ -965,7 +967,7 @@ SequentialProcessL2Block = false
 # ------------------------------------------------------------------------------
 # Interval determines the duration for L2 Blocks to be included for event
 # ------------------------------------------------------------------------------
-Interval = "36h0m0s"
+Interval = "1h0m0s"
 
 # ------------------------------------------------------------------------------
 # EnableLog will enable or disable the metrics logs
@@ -1053,7 +1055,7 @@ Level = "{{.global_log_level}}"
 # we checked. E.g. if we query and find 0 sequences to send, we'll
 # wait for WaitPeriodSendSequence before checking again
 # ------------------------------------------------------------------------------
-WaitPeriodSendSequence = "86400s"
+WaitPeriodSendSequence = "5s"
 
 # ------------------------------------------------------------------------------
 # LastBatchVirtualizationTimeMaxWaitPeriod defines the max amount of
@@ -1062,7 +1064,7 @@ WaitPeriodSendSequence = "86400s"
 # LastBatchVirtualizationTimeMaxWaitPeriod since the last time we've
 # virtualized, we'll send the sequences. Otherwise we'll wait longer.
 # ------------------------------------------------------------------------------
-LastBatchVirtualizationTimeMaxWaitPeriod = "720h"
+LastBatchVirtualizationTimeMaxWaitPeriod = "5s"
 
 # ------------------------------------------------------------------------------
 # L1BlockTimestampMargin is the duration that must exist between the
@@ -1101,7 +1103,7 @@ GasOffset = 150000
 # verified faster, decreasing this number will help ensure that you're
 # sequencing more often.
 # ------------------------------------------------------------------------------
-MaxBatchesForL1 = 10000
+MaxBatchesForL1 = 10
 
 # ------------------------------------------------------------------------------
 # L2Coinbase should generally be the address of the trusted
@@ -1115,16 +1117,16 @@ L2Coinbase = "{{.zkevm_l2_sequencer_address}}"
 
 # ------------------------------------------------------------------------------
 # SenderAddress should generally be the address of the trusted
-# sequencer. This is the address that that the manager uses for
+# sequencer. This is the address that the manager uses for
 # signing the L1 txs.
 # ------------------------------------------------------------------------------
 SenderAddress = "{{.zkevm_l2_sequencer_address}}"
 
 # ------------------------------------------------------------------------------
-# PrivateKey is a object with the keystore and password that are used
+# PrivateKey is an object with the keystore and password that are used
 # for signing transactions. The keystore is a standard go-ethereum
 # style keystore that is encrypted with the provided password. In this
-# particular context, this needs to be the sequencers private key.
+# particular context, this needs to be the sequencer's private key.
 # ------------------------------------------------------------------------------
 [SequenceSender.PrivateKey]
 Path = "/etc/zkevm/sequencer.keystore"
@@ -1159,13 +1161,13 @@ RetryTime = "30s"
 # VerifyProofInterval is the interval of time to verify and send
 # proofs to L1
 # ------------------------------------------------------------------------------
-VerifyProofInterval = "12h0m0s"
+VerifyProofInterval = "1m0s"
 
 # ------------------------------------------------------------------------------
 # ProofStatePollingInterval will determine how long we wait between
 # successive checks to see if a pending proof has been finished
 # ------------------------------------------------------------------------------
-ProofStatePollingInterval = "21600s"
+ProofStatePollingInterval = "5s"
 
 # ------------------------------------------------------------------------------
 # TxProfitabilityCheckerType is used to specify an approach for
@@ -1219,7 +1221,7 @@ ForkId = 0
 # CleanupLockedProofsInterval determines the wait duration between
 # successive calls to clean up locked proofs.
 # ------------------------------------------------------------------------------
-CleanupLockedProofsInterval = "12h0m0s"
+CleanupLockedProofsInterval = "2m0s"
 
 # ------------------------------------------------------------------------------
 # GeneratingProofCleanupThreshold determines the max amount of time
@@ -1283,10 +1285,10 @@ SenderAddress = "{{.zkevm_l2_aggregator_address}}"
 {{end}}
 
 # ------------------------------------------------------------------------------
-# PrivateKey is a object with the keystore and password that are used
+# PrivateKey is an object with the keystore and password that are used
 # for signing transactions. The keystore is a standard go-ethereum
 # style keystore that is encrypted with the provided password. In this
-# particular context, this needs to be the sequencers private key.
+# particular context, this needs to be the sequencer's private key.
 # ------------------------------------------------------------------------------
 [Aggregator.SequencerPrivateKey]
 Path = "/etc/zkevm/sequencer.keystore"
@@ -1350,7 +1352,7 @@ CheckBlocks = 0
 Percentile = 0
 
 # ------------------------------------------------------------------------------
-# UpdatePeriod determins how often we'll call the UpdateGasPriceAvg
+# UpdatePeriod determines how often we'll call the UpdateGasPriceAvg
 # method of our gas pricer
 # ------------------------------------------------------------------------------
 UpdatePeriod = "10s"
@@ -1627,6 +1629,7 @@ MaxConns = 20
 # https://github.com/0xPolygonHermez/zkevm-rom/blob/main/docs/opcode-cost-zk-counters.md
 # https://github.com/0xPolygonHermez/zkevm-techdocs/blob/main/knowledge-layer/architecture/PDFs/aggregator.pdf
 # https://github.com/0xPolygonHermez/zkevm-proverjs/tree/main/src/sm
+# https://docs.polygon.technology/zkEVM/architecture/zkprover/
 [State.Batch.Constraints]
 
 # ------------------------------------------------------------------------------

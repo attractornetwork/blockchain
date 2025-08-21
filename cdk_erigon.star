@@ -160,18 +160,12 @@ def run_rpc(plan, args, contract_setup_addresses):
         name="cdk-erigon-chain-first-batch",
     )
 
-    # Create persistent storage for RPC node
-    cdk_erigon_rpc_datadir = Directory(
-        persistent_key="cdk-erigon-rpc-datadir" + args["deployment_suffix"],
-    )
-
     config_artifacts = struct(
         config=cdk_erigon_rpc_config_artifact,
         chain_spec=cdk_erigon_chain_spec_artifact,
         chain_config=cdk_erigon_chain_config_artifact,
         chain_allocs=cdk_erigon_chain_allocs_artifact,
         chain_first_batch=cdk_erigon_chain_first_batch_artifact,
-        datadir=cdk_erigon_rpc_datadir,
     )
     cdk_erigon_package.start_cdk_erigon_rpc(
         plan, args, config_artifacts, "cdk_erigon_rpc_start_port"

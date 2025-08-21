@@ -25,6 +25,7 @@ def create_cdk_node_service_config(
                     genesis_artifact,
                     keystore_artifact.aggregator,
                     keystore_artifact.sequencer,
+                    keystore_artifact.claim_sponsor,
                 ],
             ),
             "/data": Directory(
@@ -43,7 +44,12 @@ def get_cdk_node_ports(args):
     if args["consensus_contract_type"] == constants.CONSENSUS_TYPE.pessimistic:
         ports = {
             "rpc": PortSpec(
-                args["zkevm_cdk_node_port"],
+                args.get("cdk_node_rpc_port"),
+                application_protocol="http",
+                wait=None,
+            ),
+            "rest": PortSpec(
+                args.get("aggkit_node_rest_api_port"),
                 application_protocol="http",
                 wait=None,
             ),
@@ -56,7 +62,7 @@ def get_cdk_node_ports(args):
     # In the case where we have pre deployed contract, the cdk node
     # can go through a syncing process that takes a long time and
     # might exceed the start up time
-    aggregator_wait = "15m"
+    aggregator_wait = "2m"
     if (
         "use_previously_deployed_contracts" in args
         and args["use_previously_deployed_contracts"]
@@ -65,17 +71,32 @@ def get_cdk_node_ports(args):
 
     # FEP requires the aggregator
     ports = {
-        "aggregator": PortSpec(
-            args["zkevm_aggregator_port"],
-            application_protocol="grpc",
-            wait=aggregator_wait,
-        ),
         "rpc": PortSpec(
-            args["zkevm_cdk_node_port"],
+            args.get("cdk_node_rpc_port"),
+            application_protocol="http",
+            wait=None,
+        ),
+        "rest": PortSpec(
+            args.get("aggkit_node_rest_api_port"),
             application_protocol="http",
             wait=None,
         ),
     }
+
+    # Non-pessimistic rollups require an aggregator.
+    if args.get("consensus_contract_type") != constants.CONSENSUS_TYPE.pessimistic:
+        # Determine the wait time for the aggregator.
+        # If using pre-deployed contracts, the cdk node can go through a syncing process
+        # that takes a long time and might exceed the start up time.
+        aggregator_wait = "2m"
+        if args.get("use_previously_deployed_contracts"):
+            aggregator_wait = None
+
+        ports["aggregator"] = PortSpec(
+            args.get("zkevm_aggregator_port"),
+            application_protocol="grpc",
+            wait=aggregator_wait,
+        )
 
     public_ports = ports_package.get_public_ports(ports, "cdk_node_start_port", args)
     return (ports, public_ports)
@@ -96,7 +117,7 @@ def get_cdk_node_cmd(args):
             "sleep 20 && cdk-node run "
             + "--cfg=/etc/cdk/cdk-node-config.toml "
             + "--custom-network-file=/etc/cdk/genesis.json "
-            + "--save-config-path=/tmp/ "
+            + "--save-config-path=/tmp "
             + "--components=aggsender"
         ]
 
@@ -104,7 +125,7 @@ def get_cdk_node_cmd(args):
         service_command = [
             "sleep 20 && aggkit run "
             + "--cfg=/etc/cdk/cdk-node-config.toml "
-            + "--save-config-path=/tmp/ "
+            + "--save-config-path=/tmp "
             + "--components=aggsender,bridge"
         ]
 

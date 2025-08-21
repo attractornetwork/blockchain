@@ -1,26 +1,46 @@
 ethereum_package = import_module(
-    "github.com/ethpandaops/ethereum-package/main.star@1ad949f4f65a34f041bd90050ca407e370eee579"  # 2025-04-11
-)
+    "github.com/ethpandaops/ethereum-package/main.star@82e5a7178138d892c0c31c3839c89d53ffd42d9a"
+)  # 2025-07-31
+constants = import_module("./src/package_io/constants.star")
 
-GETH_IMAGE = "ethereum/client-go:v1.14.12"
-# There's an issue with the latest version of the ethereum-package and lighthouse minimal image.
-# https://github.com/ethpandaops/ethereum-package/issues/899
-# The fix is not ideal for now since we're waiting on lighthouse to push a fix image.
-# https://github.com/ethpandaops/ethereum-package/pull/915
-LIGHTHOUSE_IMAGE = "ethpandaops/lighthouse:unstable"
+only_smc_genesis = "templates/genesis/only-smc-deployed-genesis.json"
+op_rollup_created_genesis = "templates/genesis/op-genesis.json"
 
 
 def run(plan, args):
+    if args.get("l1_custom_genesis"):
+        if args.get("consensus_contract_type") == constants.CONSENSUS_TYPE.pessimistic:
+            plan.print(
+                "Custom genesis is enabled with pessimistic consensus, using the forked ethereum package for pessimistic."
+            )
+            custom_genesis = read_file(src=op_rollup_created_genesis)
+        elif (
+            args.get("consensus_contract_type") == constants.CONSENSUS_TYPE.cdk_validium
+            or args.get("consensus_contract_type") == constants.CONSENSUS_TYPE.rollup
+        ):
+            plan.print(
+                "Custom genesis is enabled for rollup/validium consensus, using the forked ethereum package without any rollup deployed."
+            )
+            custom_genesis = read_file(src=only_smc_genesis)
+        else:
+            fail("Unknown consensus contract type")
+    else:
+        plan.print("Custom genesis is disabled, using the default ethereum package.")
+        custom_genesis = ""
     port_publisher = generate_port_publisher_config(args)
     l1_args = {
         "participants": [
             {
                 "el_type": "geth",
-                "el_image": GETH_IMAGE,
+                "el_image": args.get("geth_image"),
+                "el_extra_params": [
+                    "--log.format=json",
+                    "--gcmode archive",
+                ],
                 "cl_type": "lighthouse",
-                "cl_image": LIGHTHOUSE_IMAGE,
-                "el_extra_params": ["--gcmode archive"],
+                "cl_image": args.get("lighthouse_image"),
                 "cl_extra_params": [
+                    "--log-format=JSON",
                     # Disable optimistic finalized sync. This will force Lighthouse to
                     # verify every execution block hash with the execution client during
                     # finalized sync. By default block hashes will be checked in Lighthouse
@@ -34,11 +54,15 @@ def run(plan, args):
                     "--disable-backfill-rate-limiting",
                 ],
                 "vc_type": "lighthouse",
-                "vc_image": LIGHTHOUSE_IMAGE,
+                "vc_image": args.get("lighthouse_image"),
+                "vc_extra_params": [
+                    "--log-format=JSON",
+                ],
                 "count": args["l1_participants_count"],
             }
         ],
         "network_params": {
+            "additional_preloaded_contracts": custom_genesis,
             "network_id": str(args["l1_chain_id"]),
             "preregistered_validator_keys_mnemonic": args["l1_preallocated_mnemonic"],
             "preset": args["l1_preset"],
@@ -60,23 +84,14 @@ def run(plan, args):
             # GENESIS_DELAY, Default: 12
             # This is a grace period to allow nodes and node operators time to prepare for the genesis event. The genesis event cannot occur before MIN_GENESIS_TIME. If MIN_GENESIS_ACTIVE_VALIDATOR_COUNT validators are not registered sufficiently in advance of MIN_GENESIS_TIME, then Genesis will occur GENESIS_DELAY seconds after enough validators have been registered.
             "genesis_delay": 12,
+            # Enable the Electra hardfork.
+            # Note: The electra fork epoch is set to 1 instead of 0 to avoid the following error in the CL node (lighthouse).
+            #  Mar 11 11:56:46.595 CRIT Failed to start beacon node             reason: Built-in genesis state SSZ bytes are invalid: OffsetOutOfBounds(522733568)
+            "electra_fork_epoch": derive_l1_preset(args),
         },
         "additional_services": args["l1_additional_services"],
         "port_publisher": port_publisher,
     }
-
-    # Enable Pectra hardfork if needed.
-    if args.get("pectra_enabled", False):
-        # Note: The electra fork epoch is set to 1 instead of 0 to avoid the following error in the CL node (lighthouse).
-        #  Mar 11 11:56:46.595 CRIT Failed to start beacon node             reason: Built-in genesis state SSZ bytes are invalid: OffsetOutOfBounds(522733568)
-        l1_args["network_params"]["electra_fork_epoch"] = 1
-
-        # Use pectra ready client images.
-        default_participant = l1_args["participants"][0]
-        default_participant["el_image"] = "ethpandaops/geth:prague-devnet-6"
-        default_participant["cl_image"] = "ethpandaops/lighthouse:unstable"
-        default_participant["vc_image"] = "ethpandaops/lighthouse:unstable"
-        l1_args["participants"][0] = default_participant
 
     l1 = ethereum_package.run(plan, l1_args)
     cl_rpc_url = l1.all_participants[0].cl_context.beacon_http_url
@@ -124,5 +139,12 @@ def _wait_for_l1_startup(plan, cl_rpc_url):
                 "done",
             ]
         ),
-        wait="15m",
+        wait="5m",
     )
+
+
+def derive_l1_preset(args):
+    if args["l1_preset"] == "mainnet":
+        return 0
+    else:
+        return 1

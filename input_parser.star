@@ -9,10 +9,10 @@ DEFAULT_DEPLOYMENT_STAGES = {
     # Set to false to use an external L1 like Sepolia.
     # Note that it will require a few additional parameters.
     "deploy_l1": True,
-    # Deploy zkevm contracts on L1 (as well as fund accounts).
-    # Set to false to use pre-deployed zkevm contracts.
+    # Deploy agglayer contracts on L1 (as well as fund accounts).
+    # Set to false to use pre-deployed agglayer contracts.
     # Note that it will require a few additional parameters.
-    "deploy_zkevm_contracts_on_l1": True,
+    "deploy_agglayer_contracts_on_l1": True,
     # Deploy databases.
     "deploy_databases": True,
     # Deploy CDK central/trusted environment.
@@ -30,42 +30,46 @@ DEFAULT_DEPLOYMENT_STAGES = {
     # Note the default behavior will only deploy the OP Stack without CDK Erigon stack.
     # Setting to True will deploy the Aggkit components and Sovereign contracts as well.
     # Requires consensus_contract_type to be "pessimistic".
-    "deploy_optimism_rollup": False,
+    "deploy_optimism_rollup": True,
     # After deploying OP Stack, upgrade it to OP Succinct.
     # Even mock-verifier deployments require an actual SPN network key.
     "deploy_op_succinct": False,
     # Deploy contracts on L2 (as well as fund accounts).
     "deploy_l2_contracts": False,
-    # Use cdk-node as sequencer. Please turn on this flag when you want to use cdk-node as sequencer on production.
-    # For testnet, you can use cdk-erigon without cdk-node and save your money for L1 requests.
-    "use_cdk_node_as_sequencer": False,
+    # Deploy aggkit node in parallel to cdk node.
+    "deploy_aggkit_node": False,
 }
 
 DEFAULT_IMAGES = {
-    # "aggkit_image": "goranethernal/aggkit:v0.0.2-beta8",  # https://github.com/agglayer/aggkit/pkgs/container/aggkit
-    # "aggkit_image": "jestpol/aggkit:v0.0.2-beta9",  # https://github.com/agglayer/aggkit/pkgs/container/aggkit
-    # "aggkit_image": "arnaubennassar/aggkit:477acb6",  # https://github.com/agglayer/aggkit/pkgs/container/aggkit
-    "aggkit_image": "goranethernal/aggkit:v0.0.2-beta15",  # https://github.com/agglayer/aggkit/pkgs/container/aggkit
-    "agglayer_image": "ghcr.io/agglayer/agglayer:0.3.0-rc.16",  # https://github.com/agglayer/agglayer/pkgs/container/agglayer
-    "aggkit_prover_image": "ghcr.io/agglayer/aggkit-prover:0.1.0-rc.20",  # https://github.com/agglayer/provers/pkgs/container/aggkit-prover
-    "cdk_erigon_node_image": "hermeznetwork/cdk-erigon:v2.61.19",  # https://hub.docker.com/r/hermeznetwork/cdk-erigon/tags
-    "cdk_node_image": "ghcr.io/0xpolygon/cdk:0.5.4-rc1",  # https://github.com/0xpolygon/cdk/pkgs/container/cdk
-    "cdk_validium_node_image": "ghcr.io/0xpolygon/cdk-validium-node:0.6.4-cdk.10",  # https://github.com/0xPolygon/cdk-validium-node/pkgs/container/cdk-validium-node/
-    "zkevm_bridge_proxy_image": "haproxy:3.1-bookworm",  # https://hub.docker.com/_/haproxy/tags
-    "zkevm_bridge_service_image": "hermeznetwork/zkevm-bridge-service:v0.6.0-RC16",  # https://hub.docker.com/r/hermeznetwork/zkevm-bridge-service/tags
-    "zkevm_bridge_ui_image": "leovct/zkevm-bridge-ui:multi-network",  # https://hub.docker.com/r/leovct/zkevm-bridge-ui/tags
-    # TODO: Update the image to the official version.
-    "zkevm_contracts_image": "jhkimqd/zkevm-contracts:v10.0.0-rc.6-fork.12",  # https://hub.docker.com/repository/docker/leovct/zkevm-contracts/tags
-    "zkevm_da_image": "ghcr.io/0xpolygon/cdk-data-availability:0.0.13",  # https://github.com/0xpolygon/cdk-data-availability/pkgs/container/cdk-data-availability
-    "zkevm_node_image": "hermeznetwork/zkevm-node:v0.7.3",  # https://hub.docker.com/r/hermeznetwork/zkevm-node/tags
-    "zkevm_pool_manager_image": "hermeznetwork/zkevm-pool-manager:v0.1.2",  # https://hub.docker.com/r/hermeznetwork/zkevm-pool-manager/tags
-    "zkevm_prover_image": "hermeznetwork/zkevm-prover:v8.0.0-RC16-fork.12",  # https://hub.docker.com/r/hermeznetwork/zkevm-prover/tags
-    "zkevm_sequence_sender_image": "hermeznetwork/zkevm-sequence-sender:v0.2.4",  # https://hub.docker.com/r/hermeznetwork/zkevm-sequence-sender/tags
-    "anvil_image": "ghcr.io/foundry-rs/foundry:v1.0.0",  # https://github.com/foundry-rs/foundry/pkgs/container/foundry/versions?filters%5Bversion_type%5D=tagged
-    "mitm_image": "mitmproxy/mitmproxy:11.1.3",  # https://hub.docker.com/r/mitmproxy/mitmproxy/tags
-    "op_succinct_contract_deployer_image": "atanmarko/op-succinct-contract-deployer:v1.2.11-agglayer",  # https://hub.docker.com/r/jhkimqd/op-succinct-contract-deployer
-    "op_succinct_server_image": "ghcr.io/agglayer/op-succinct/succinct-proposer:v1.2.12-agglayer",  # https://github.com/agglayer/op-succinct/pkgs/container/op-succinct%2Fsuccinct-proposer
-    "op_succinct_proposer_image": "ghcr.io/agglayer/op-succinct/op-proposer:v1.2.12-agglayer",  # https://github.com/agglayer/op-succinct/pkgs/container/op-succinct%2Fop-proposer
+    "aggkit_image": "ghcr.io/agglayer/aggkit:0.5.0-beta4",
+    "aggkit_prover_image": "ghcr.io/agglayer/aggkit-prover:1.2.0",
+    "agglayer_image": "ghcr.io/agglayer/agglayer:0.3.5",
+    "agglayer_contracts_image": "europe-west2-docker.pkg.dev/prj-polygonlabs-devtools-dev/public/agglayer-contracts:v11.0.0-rc.2-fork.12",
+    "anvil_image": "ghcr.io/foundry-rs/foundry:v1.0.0",
+    "cdk_erigon_node_image": "hermeznetwork/cdk-erigon:v2.61.23",
+    "cdk_sovereign_erigon_node_image": "hermeznetwork/cdk-erigon:v2.63.0-rc4",  # Type-1 CDK Erigon Sovereign
+    "cdk_node_image": "ghcr.io/0xpolygon/cdk:0.5.4",
+    "cdk_validium_node_image": "ghcr.io/0xpolygon/cdk-validium-node:0.6.4-cdk.10",
+    "db_image": "postgres:16.2",
+    "geth_image": "ethereum/client-go:v1.16.2",
+    "lighthouse_image": "sigp/lighthouse:v7.1.0",
+    "mitm_image": "mitmproxy/mitmproxy:11.1.3",
+    "op_batcher_image": "us-docker.pkg.dev/oplabs-tools-artifacts/images/op-batcher:v1.14.0",
+    "op_contract_deployer_image": "europe-west2-docker.pkg.dev/prj-polygonlabs-devtools-dev/public/op-deployer:v0.4.0-rc.2",
+    "op_geth_image": "us-docker.pkg.dev/oplabs-tools-artifacts/images/op-geth:v1.101511.1",
+    "op_node_image": "us-docker.pkg.dev/oplabs-tools-artifacts/images/op-node:v1.13.5",
+    "op_proposer_image": "us-docker.pkg.dev/oplabs-tools-artifacts/images/op-proposer:v1.10.0",
+    "op_succinct_proposer_image": "ghcr.io/agglayer/op-succinct/op-succinct:v2.3.3-agglayer",
+    "status_checker_image": "ghcr.io/0xpolygon/status-checker:v0.2.8",
+    "test_runner_image": "europe-west2-docker.pkg.dev/prj-polygonlabs-devtools-dev/public/e2e:9fe80e1",
+    "zkevm_da_image": "ghcr.io/0xpolygon/cdk-data-availability:0.0.13",
+    "zkevm_bridge_proxy_image": "haproxy:3.1-bookworm",
+    "zkevm_bridge_service_image": "hermeznetwork/zkevm-bridge-service:v0.6.2-RC2",
+    "zkevm_bridge_ui_image": "europe-west2-docker.pkg.dev/prj-polygonlabs-devtools-dev/public/zkevm-bridge-ui:0006445",
+    "zkevm_node_image": "hermeznetwork/zkevm-node:v0.7.3",
+    "zkevm_pool_manager_image": "hermeznetwork/zkevm-pool-manager:v0.1.2",
+    "zkevm_prover_image": "hermeznetwork/zkevm-prover:v8.0.0-RC16-fork.12",
+    "zkevm_sequence_sender_image": "hermeznetwork/zkevm-sequence-sender:v0.2.4",
 }
 
 DEFAULT_PORTS = {
@@ -80,6 +84,7 @@ DEFAULT_PORTS = {
     # aggkit-prover
     "aggkit_prover_grpc_port": 4446,
     "aggkit_prover_metrics_port": 9093,
+    "aggkit_pprof_port": 6060,
     "prometheus_port": 9091,
     "zkevm_aggregator_port": 50081,
     "zkevm_bridge_grpc_port": 9090,
@@ -94,13 +99,13 @@ DEFAULT_PORTS = {
     "zkevm_pprof_port": 6060,
     "zkevm_rpc_http_port": 8123,
     "zkevm_rpc_ws_port": 8133,
-    "zkevm_cdk_node_port": 5576,
+    "cdk_node_rpc_port": 5576,
+    "aggkit_node_rest_api_port": 5577,
     "blockscout_frontend_port": 3000,
     "anvil_port": 8545,
     "mitm_port": 8234,
-    "op_succinct_server_port": 3000,
-    "op_succinct_proposer_metrics_port": 7300,
-    "op_succinct_proposer_rpc_port": 8545,
+    "op_succinct_proposer_metrics_port": 8080,
+    "op_succinct_proposer_grpc_port": 50051,
     "op_proposer_port": 8560,
 }
 
@@ -140,48 +145,53 @@ DEFAULT_STATIC_PORTS = {
         "blutgang_start_port": 52010,
         "erpc_start_port": 52020,
         "panoptichain_start_port": 52030,
+        "status_checker_start_port": 52040,
     }
 }
 
 # Addresses and private keys of the different components.
 # They have been generated using the following command:
-# polycli wallet inspect --mnemonic 'lab code glass agree maid neutral vessel horror deny frequent favorite soft gate galaxy proof vintage once figure diary virtual scissors marble shrug drop' --addresses 12 | tee keys.txt | jq -r '.Addresses[] | [.ETHAddress, .HexPrivateKey] | @tsv' | awk 'BEGIN{split("sequencer,aggregator,claimtxmanager,timelock,admin,loadtest,agglayer,dac,proofsigner,l1testing,aggoracle,sovereignadmin",roles,",")} {print "# " roles[NR] "\n\"zkevm_l2_" roles[NR] "_address\": \"" $1 "\","; print "\"zkevm_l2_" roles[NR] "_private_key\": \"0x" $2 "\",\n"}'
+# polycli wallet inspect --mnemonic 'lab code glass agree maid neutral vessel horror deny frequent favorite soft gate galaxy proof vintage once figure diary virtual scissors marble shrug drop' --addresses 13 | tee keys.txt | jq -r '.Addresses[] | [.ETHAddress, .HexPrivateKey] | @tsv' | awk 'BEGIN{split("sequencer,aggregator,claimtxmanager,timelock,admin,loadtest,agglayer,dac,proofsigner,l1testing,aggoracle,sovereignadmin,claimsponsor",roles,",")} {print "# " roles[NR] "\n\"zkevm_l2_" roles[NR] "_address\": \"" $1 "\","; print "\"zkevm_l2_" roles[NR] "_private_key\": \"0x" $2 "\",\n"}'
 DEFAULT_ACCOUNTS = {
-    "zkevm_l2_sequencer_address": "0x8A468c758C1a9A0dB1D4E58F62f052DE8FB03B7e",
-    "zkevm_l2_sequencer_private_key": "0x5122c3cea6263c6029f7468a513a42cf749a006b8bab573dcc710baa89141481",
-
-    "zkevm_l2_aggregator_address": "0xB144b2aD5a92B30E95d06c090B1284362ce10A22",
-    "zkevm_l2_aggregator_private_key": "0x396f98c8d617723ea4d7e14acac589197f51444e7a51772f75b6be4a6e46a43b",
-
-    "zkevm_l2_claimtxmanager_address": "0xBC6bcc1600f5aC8a2843be3057B4098A9F9e4e01",
-    "zkevm_l2_claimtxmanager_private_key": "0xa4ee8f4a9a7b13e78876d0fd324cf009a6668ded3662c01a82faea5bd90dfe27",
-
-    "zkevm_l2_timelock_address": "0x488FFD91b6100d5E221C91de0cD53dCFc1EB9529",
-    "zkevm_l2_timelock_private_key": "0xa1f6036a8d8b020d7378bed92f335408ebd73dc782322505b1dd098cf1f5d291",
-
-    "zkevm_l2_admin_address": "0x58323B1796c2345D6e39Fb18AA0a0363d117B99B",
-    "zkevm_l2_admin_private_key": "0x2d2a9c4e2b73000b5cb182d52acabca202774289487b0ce068fb36017ec013ea",
-
-    "zkevm_l2_loadtest_address": "0xC4FED68A2AA408D7948CF5070b09fCA7585bAc8c",
-    "zkevm_l2_loadtest_private_key": "0x6beeed13c632e12b5b6728537efab68afb200c8e3a66a061802d30249e879dda",
-
-    "zkevm_l2_agglayer_address": "0x60f59aE67386D320f0a169E174D53dD80dE90D6e",
-    "zkevm_l2_agglayer_private_key": "0x937ef86cd4c42dc6ae6ee35d29d0e3cd149d792f1f0a03b8cd8213cf7fc73348",
-
-    "zkevm_l2_dac_address": "0x003A7EA8f51dd4AF472D6B1a63CE91379C9DDed5",
-    "zkevm_l2_dac_private_key": "0x183a50767b9220edd1abb37e359cc12ccbd82f7b01c85becd58fa108af4d1e87",
-
-    "zkevm_l2_proofsigner_address": "0x5d064eEEc2958Cda9336E206c75c1450a345c866",
-    "zkevm_l2_proofsigner_private_key": "0x5a818a8c6037d7d83b7ed8b77a4603a4ee5e2d5e30e68b70899931d8fecb1181",
-
-    "zkevm_l2_l1testing_address": "0xdd663E6e771df26d2d2352e6cB7B711BBb4f1225",
-    "zkevm_l2_l1testing_private_key": "0x8c37815d3dfb6bec172227d09d981e0cd7e9a3ff1ee20e0864dfa360ebbe2ee1",
-
-    "zkevm_l2_aggoracle_address": "0x95d7109795a8F2f473F264D4ea67127fa960b014",
-    "zkevm_l2_aggoracle_private_key": "0xb08f0d7cbb53b32a6d46bfab11c31b549ec47b24af11cad68207e7aee83f5e5a",
-
-    "zkevm_l2_sovereignadmin_address": "0x605a6Dbc3D3B83eC3235083BbFDaf1f4d0Fc1a81",
-    "zkevm_l2_sovereignadmin_private_key": "0xf50d94f5e24e646b6abb993c853b1dfd3571757c21de00f814668d1fc7ae082f",
+    # sequencer
+    "zkevm_l2_sequencer_address": "0x5b06837A43bdC3dD9F114558DAf4B26ed49842Ed",
+    "zkevm_l2_sequencer_private_key": "0x183c492d0ba156041a7f31a1b188958a7a22eebadca741a7fe64436092dc3181",
+    # aggregator
+    "zkevm_l2_aggregator_address": "0xCae5b68Ff783594bDe1b93cdE627c741722c4D4d",
+    "zkevm_l2_aggregator_private_key": "0x2857ca0e7748448f3a50469f7ffe55cde7299d5696aedd72cfe18a06fb856970",
+    # claimtxmanager
+    "zkevm_l2_claimtxmanager_address": "0x5f5dB0D4D58310F53713eF4Df80ba6717868A9f8",
+    "zkevm_l2_claimtxmanager_private_key": "0x8d5c9ecd4ba2a195db3777c8412f8e3370ae9adffac222a54a84e116c7f8b934",
+    # timelock
+    "zkevm_l2_timelock_address": "0x130aA39Aa80407BD251c3d274d161ca302c52B7A",
+    "zkevm_l2_timelock_private_key": "0x80051baf5a0a749296b9dcdb4a38a264d2eea6d43edcf012d20b5560708cf45f",
+    # admin
+    "zkevm_l2_admin_address": "0xE34aaF64b29273B7D567FCFc40544c014EEe9970",
+    "zkevm_l2_admin_private_key": "0x12d7de8621a77640c9241b2595ba78ce443d05e94090365ab3bb5e19df82c625",
+    # loadtest
+    "zkevm_l2_loadtest_address": "0x81457240ff5b49CaF176885ED07e3E7BFbE9Fb81",
+    "zkevm_l2_loadtest_private_key": "0xd7df6d64c569ffdfe7c56e6b34e7a2bdc7b7583db74512a9ffe26fe07faaa5de",
+    # agglayer
+    "zkevm_l2_agglayer_address": "0x351e560852ee001d5D19b5912a269F849f59479a",
+    "zkevm_l2_agglayer_private_key": "0x1d45f90c0a9814d8b8af968fa0677dab2a8ff0266f33b136e560fe420858a419",
+    # dac
+    "zkevm_l2_dac_address": "0x5951F5b2604c9B42E478d5e2B2437F44073eF9A6",
+    "zkevm_l2_dac_private_key": "0x85d836ee6ea6f48bae27b31535e6fc2eefe056f2276b9353aafb294277d8159b",
+    # proofsigner
+    "zkevm_l2_proofsigner_address": "0x7569cc70950726784c8D3bB256F48e43259Cb445",
+    "zkevm_l2_proofsigner_private_key": "0x77254a70a02223acebf84b6ed8afddff9d3203e31ad219b2bf900f4780cf9b51",
+    # l1testing
+    "zkevm_l2_l1testing_address": "0xfa291C5f54E4669aF59c6cE1447Dc0b3371EF046",
+    "zkevm_l2_l1testing_private_key": "0x1324200455e437cd9d9dc4aa61c702f06fb5bc495dc8ad94ae1504107a216b59",
+    # aggoracle
+    "zkevm_l2_aggoracle_address": "0x0b68058E5b2592b1f472AdFe106305295A332A7C",
+    "zkevm_l2_aggoracle_private_key": "0x6d1d3ef5765cf34176d42276edd7a479ed5dc8dbf35182dfdb12e8aafe0a4919",
+    # sovereignadmin
+    "zkevm_l2_sovereignadmin_address": "0xc653eCD4AC5153a3700Fb13442Bcf00A691cca16",
+    "zkevm_l2_sovereignadmin_private_key": "0xa574853f4757bfdcbb59b03635324463750b27e16df897f3d00dc6bef2997ae0",
+    # claimsponsor
+    "zkevm_l2_claimsponsor_address": "0x635243A11B41072264Df6c9186e3f473402F94e9",
+    "zkevm_l2_claimsponsor_private_key": "0x986b325f6f855236b0b04582a19fe0301eeecb343d0f660c61805299dbf250eb",
 }
 
 DEFAULT_L1_ARGS = {
@@ -189,18 +199,20 @@ DEFAULT_L1_ARGS = {
     "l1_engine": "geth",
     # The L1 network identifier.
     "l1_chain_id": 271828,
+    # Custom L1 genesis
+    "l1_custom_genesis": False,
     # This mnemonic will:
     # a) be used to create keystores for all the types of validators that we have, and
     # b) be used to generate a CL genesis.ssz that has the children validator keys already
     # preregistered as validators
-    "l1_preallocated_mnemonic": "quit buddy poet only slide fitness sunny utility poem brave apart antique",
+    "l1_preallocated_mnemonic": "giant issue aisle success illegal bike spike question tent bar rely arctic volcano long crawl hungry vocal artwork sniff fantasy very lucky have athlete",
     # cast wallet private-key --mnemonic $l1_preallocated_mnemonic
-    "l1_preallocated_private_key": "0x5122c3cea6263c6029f7468a513a42cf749a006b8bab573dcc710baa89141481",
+    "l1_preallocated_private_key": "0xbcdf20249abf0ed6d944c0288fad489e33f66b3960d9e6229c1cd214ed3bbe31",
     # The L1 HTTP RPC endpoint.
     "l1_rpc_url": "http://el-1-geth-lighthouse:8545",
     # The L1 WS RPC endpoint.
     "l1_ws_url": "ws://el-1-geth-lighthouse:8546",
-    # The L1 concensus layer RPC endpoint.
+    # The L1 consensus layer RPC endpoint.
     "l1_beacon_url": "http://cl-1-lighthouse-geth:4000",
     # The additional services to spin up.
     # Default: []
@@ -238,8 +250,6 @@ DEFAULT_L1_ARGS = {
     # Number of seconds per slot on the Beacon chain
     # Default: 12
     "l1_seconds_per_slot": 2,
-    # Enable the Electra hardfork.
-    "pectra_enabled": False,
     # The amount of ETH sent to the admin, sequence, aggregator, sequencer and other chosen addresses.
     "l1_funding_amount": "1000000ether",
     # Default: 2
@@ -275,7 +285,7 @@ DEFAULT_L2_ARGS = {
     # polycli wallet inspect --mnemonic '{{.l1_preallocated_mnemonic}}'
     "l2_accounts_to_fund": 10,
     # The amount of ETH sent to each of the prefunded l2 accounts.
-    "l2_funding_amount": "1000ether",
+    "l2_funding_amount": "100ether",
     # Whether to deploy https://github.com/Arachnid/deterministic-deployment-proxy.
     # Not deploying this will may cause errors or short circuit other contract
     # deployments.
@@ -295,7 +305,7 @@ DEFAULT_ROLLUP_ARGS = {
     # The keystore password.
     "zkevm_l2_keystore_password": "pSnv6Dh5s9ahuzGzH9RoCDrKAMddaX3m",
     # The rollup network identifier.
-    "zkevm_rollup_chain_id": 9701,
+    "zkevm_rollup_chain_id": 2151908,
     # The unique identifier for the rollup within the RollupManager contract.
     # This setting sets the rollup as the first rollup.
     "zkevm_rollup_id": 1,
@@ -303,20 +313,6 @@ DEFAULT_ROLLUP_ARGS = {
     # Change to true to deploy a real verifier which will require a real prover.
     # Note: This will require a lot of memory to run!
     "zkevm_use_real_verifier": False,
-    # If we're using pessimistic consensus and a real verifier, we'll
-    # need to know which vkey to use. This value is tightly coupled to
-    # the agglayer version that's being used
-    # TODO automate this `docker run -it ghcr.io/agglayer/aggkit-prover:0.1.0-rc.8 aggkit-prover vkey`
-    "aggchain_vkey_hash": "",
-    # AggchainFEP, PolygonValidiumEtrog, PolygonZkEVMEtrog consensus requires programVKey === bytes32(0).
-    # TODO automate this `docker run -it ghcr.io/agglayer/agglayer:0.3.0-rc.7 agglayer vkey`
-    "pp_vkey_hash": constants.ZERO_HASH,
-    # The 4 bytes selector to add to the pessimistic verification keys (AggLayerGateway)
-    # TODO automate this `docker run -it ghcr.io/agglayer/agglayer:0.3.0-rc.7 agglayer vkey-selector`
-    "pp_vkey_selector": "0x00000001",
-    # Initial aggchain selector
-    # TODO automate taking the first 2 bytes of this `docker run -it ghcr.io/agglayer/aggkit-prover:0.1.0-rc.8 aggkit-prover vkey-selector`
-    "aggchain_vkey_version": "0x0000",
     # ForkID for the consensus contract. Must be 0 for AggchainFEP consensus.
     "fork_id": 12,
     # This flag will enable a stateless executor to verify the execution of the batches.
@@ -365,9 +361,12 @@ DEFAULT_ROLLUP_ARGS = {
     # The type of primary prover to use in aggkit-prover.
     "aggkit_prover_primary_prover": "mock-prover",
     # The URL where the aggkit-prover can be reached for gRPC
-    "aggkit_prover_grpc_url": "aggkit-prover:"
-    + str(DEFAULT_PORTS.get("aggkit_prover_grpc_port")),
-    "zkevm_path_rw_data": "/tmp/",
+    "aggkit_prover_grpc_url_prefix": "aggkit-prover",
+    # Enable aggkit pprof profiling
+    "aggkit_pprof_enabled": True,
+    # This is a path where the cdk-node will write data
+    # https://github.com/0xPolygon/cdk/blob/d0e76a3d1361158aa24135f25d37ecc4af959755/config/default.go#L50
+    "zkevm_path_rw_data": "/tmp",
     # OP Stack EL RPC URL. Will be dynamically updated by args_sanity_check() function.
     "op_el_rpc_url": "http://op-el-1-op-geth-op-node-001:8545",
     # OP Stack CL Node URL. Will be dynamically updated by args_sanity_check() function.
@@ -376,6 +375,10 @@ DEFAULT_ROLLUP_ARGS = {
     # true = mock
     # false = network
     "op_succinct_mock": False,
+    "aggkit_components": "aggsender,aggoracle,bridge",
+    # Toggle to enable the claimsponsor on the aggkit node.
+    # Note: aggkit will only start the claimsponsor if the bridge is also enabled.
+    "enable_aggkit_claim_sponsor": False,
 }
 
 DEFAULT_PLESS_ZKEVM_NODE_ARGS = {
@@ -412,12 +415,12 @@ DEFAULT_ARGS = (
         # The type of consensus contract to use.
         # Consensus Options:
         # - 'rollup': Transaction data is stored on-chain on L1.
-        # - 'cdk-validium': Transaction data is stored off-chain using the CDK DA layer and a DAC.
+        # - 'cdk_validium': Transaction data is stored off-chain using the CDK DA layer and a DAC.
         # - 'pessimistic': deploy with pessimistic consensus
         # Aggchain Consensus Options:
         # - 'ecdsa': Aggchain using an ECDSA signature with CONSENSUS_TYPE = 1.
         # - 'fep': Generic aggchain using Full Execution Proofs that relies on op-succinct stack.
-        "consensus_contract_type": constants.CONSENSUS_TYPE.cdk_validium,
+        "consensus_contract_type": constants.CONSENSUS_TYPE.pessimistic,
         # Additional services to run alongside the network.
         # Options:
         # - arpeggio
@@ -428,10 +431,14 @@ DEFAULT_ARGS = (
         # - erpc
         # - observability
         # - pless_zkevm_node
+        # - rpc_fuzzer
         # - status_checker
         # - test_runner
         # - tx_spammer
-        "additional_services": [constants.ADDITIONAL_SERVICES.test_runner],
+        "additional_services": [
+            constants.ADDITIONAL_SERVICES.test_runner,
+            constants.ADDITIONAL_SERVICES.bridge_spammer,
+        ],
         # Only relevant when deploying to an external L1.
         "polygon_zkevm_explorer": "https://explorer.private/",
         "l1_explorer_url": "https://sepolia.etherscan.io/",
@@ -450,21 +457,39 @@ DEFAULT_ARGS = (
 # The below OP params can be customized by specifically referring to an artifact or image.
 # If none is is provided, it will refer to the default images from the Optimism-Package repo.
 # https://github.com/ethpandaops/optimism-package/blob/main/src/package_io/input_parser.star
+OP_ARTIFACTS_LOCATOR = "https://storage.googleapis.com/oplabs-contract-artifacts/artifacts-v1-02024c5a26c16fc1a5c716fff1c46b5bf7f23890d431bb554ddbad60971211d4.tar.gz"
 DEFAULT_OP_STACK_ARGS = {
-    "source": "github.com/ethpandaops/optimism-package/main.star@884f4eb813884c4c8e5deead6ca4e0c54b85da90",
-    "predeployed_contracts": False,
+    "source": "github.com/agglayer/optimism-package/main.star@cc37713aff9c4955dd6975cdbc34072a1286754e",
+    "predeployed_contracts": True,
     "chains": [
         {
             "participants": [
                 {
-                    # OP Rollup configuration
                     "el_type": "op-geth",
-                    "el_image": "us-docker.pkg.dev/oplabs-tools-artifacts/images/op-geth:v1.101500.0-rc.3",
+                    "el_image": DEFAULT_IMAGES.get("op_geth_image"),
+                    "el_extra_params": [
+                        "--log.format=json",
+                    ],
                     "cl_type": "op-node",
-                    "cl_image": "us-docker.pkg.dev/oplabs-tools-artifacts/images/op-node:v1.11.0-rc.2",
+                    "cl_image": DEFAULT_IMAGES.get("op_node_image"),
+                    "cl_extra_params": [
+                        "--log.format=json",
+                    ],
                     "count": 1,
                 },
             ],
+            "batcher_params": {
+                "image": DEFAULT_ARGS.get("op_batcher_image"),
+                "extra_params": [
+                    "--log.format=json",
+                ],
+            },
+            "proposer_params": {
+                "image": DEFAULT_ARGS.get("op_proposer_image"),
+                "extra_params": [
+                    "--log.format=json",
+                ],
+            },
             "network_params": {
                 # name maps to l2_services_suffix in optimism. The optimism-package appends a suffix with the following format: -<name>
                 # the "-" however adds another "-" to the Kurtosis deployment_suffix. So we are doing string manipulation to remove the "-"
@@ -472,9 +497,21 @@ DEFAULT_OP_STACK_ARGS = {
                 "network_id": str(DEFAULT_ROLLUP_ARGS.get("zkevm_rollup_chain_id")),
                 # The blocktime on the OP network
                 "seconds_per_slot": 1,
+                # Isthmus fork
+                # Defaults to None - not activated - decimal value
+                # Offset is in seconds
+                "isthmus_time_offset": 0,
             },
         },
     ],
+    "op_contract_deployer_params": {
+        "image": DEFAULT_ARGS.get("op_contract_deployer_image"),
+        "l1_artifacts_locator": OP_ARTIFACTS_LOCATOR,
+        "l2_artifacts_locator": OP_ARTIFACTS_LOCATOR,
+    },
+    "observability": {
+        "enabled": False,
+    },
 }
 
 VALID_ADDITIONAL_SERVICES = [
@@ -513,7 +550,6 @@ def parse_args(plan, user_args):
     args_sanity_check(plan, deployment_stages, args, user_args, op_stack_args)
 
     validate_consensus_type(args.get("consensus_contract_type"))
-    validate_vkeys(plan, args, deployment_stages)
 
     # Setting mitm for each element set to true on mitm dict
     mitm_rpc_url = (
@@ -535,9 +571,9 @@ def parse_args(plan, user_args):
 
     validate_additional_services(args.get("additional_services", []))
 
-    # Determine fork id from the zkevm contracts image tag.
-    zkevm_contracts_image = args.get("zkevm_contracts_image", "")
-    (fork_id, fork_name) = get_fork_id(zkevm_contracts_image)
+    # Determine fork id from the agglayer contracts image tag.
+    agglayer_contracts_image = args.get("agglayer_contracts_image", "")
+    (fork_id, fork_name) = get_fork_id(agglayer_contracts_image)
 
     # Determine sequencer and l2 rpc names.
     sequencer_type = args.get("sequencer_type", "")
@@ -613,11 +649,11 @@ def validate_additional_services(additional_services):
             )
 
 
-def get_fork_id(zkevm_contracts_image):
+def get_fork_id(agglayer_contracts_image):
     """
-    Extract the fork identifier and fork name from a zkevm contracts image name.
+    Extract the fork identifier and fork name from a agglayer contracts image name.
 
-    The zkevm contracts tags follow the convention:
+    The agglayer contracts tags follow the convention:
     v<SEMVER>-rc.<RC_NUMBER>-fork.<FORK_ID>[-patch.<PATCH_NUMBER>]
 
     Where:
@@ -631,11 +667,11 @@ def get_fork_id(zkevm_contracts_image):
     - v7.0.0-rc.1-fork.10
     - v7.0.0-rc.1-fork.11-patch.1
     """
-    result = zkevm_contracts_image.split("-patch.")[0].split("-fork.")
+    result = agglayer_contracts_image.split("-patch.")[0].split("-fork.")
     if len(result) != 2:
         fail(
-            "The zkevm contracts image tag '{}' does not follow the standard v<SEMVER>-rc.<RC_NUMBER>-fork.<FORK_ID>".format(
-                zkevm_contracts_image
+            "The agglayer contracts image tag '{}' does not follow the standard v<SEMVER>-rc.<RC_NUMBER>-fork.<FORK_ID>".format(
+                agglayer_contracts_image
             )
         )
 
@@ -685,10 +721,10 @@ def get_op_stack_args(plan, args, user_op_stack_args):
     l1_preallocated_mnemonic = args.get("l1_preallocated_mnemonic", "")
     private_key_result = plan.run_sh(
         description="Deriving the private key from the mnemonic",
+        image=constants.TOOLBOX_IMAGE,
         run="cast wallet private-key --mnemonic \"{}\" | tr -d '\n'".format(
             l1_preallocated_mnemonic
         ),
-        image=constants.TOOLBOX_IMAGE,
     )
     private_key = private_key_result.output
 
@@ -802,12 +838,6 @@ def args_sanity_check(plan, deployment_stages, args, user_args, op_stack_args):
             )
         )
 
-    # Gas token check
-    if args.get("gas_token_enabled", False):
-        # Ensure gas token is not used with OP Rollup.
-        if deployment_stages.get("deploy_optimism_rollup", False):
-            fail("Gas token is not supported when deploying OP Rollup.")
-
     # CDK Erigon normalcy and strict mode check
     if args["enable_normalcy"] and args["erigon_strict_mode"]:
         fail("normalcy and strict mode cannot be enabled together")
@@ -815,7 +845,10 @@ def args_sanity_check(plan, deployment_stages, args, user_args, op_stack_args):
     # OP rollup deploy_optimistic_rollup and consensus_contract_type check
     if deployment_stages.get("deploy_optimism_rollup", False):
         if args["consensus_contract_type"] != constants.CONSENSUS_TYPE.pessimistic:
-            if args["consensus_contract_type"] != "fep":
+            if (
+                args["consensus_contract_type"] != "fep"
+                and args["consensus_contract_type"] != "ecdsa"
+            ):
                 plan.print(
                     "Current consensus_contract_type is '{}', changing to pessimistic for OP deployments.".format(
                         args["consensus_contract_type"]
@@ -843,22 +876,6 @@ def args_sanity_check(plan, deployment_stages, args, user_args, op_stack_args):
                 "OP Stack rollup requires L1 blocktime > 1 second. Change the l1_seconds_per_slot parameter"
             )
 
-    # Sanity checking and overwriting input parameters for cdk-validium consensus with supported inputs.
-    consensus_contract_type = args.get("consensus_contract_type")
-    if consensus_contract_type in [
-        constants.CONSENSUS_TYPE.rollup,
-        constants.CONSENSUS_TYPE.cdk_validium,
-    ]:
-        if "v10" in args["zkevm_contracts_image"]:
-            plan.print(
-                "For '{}' consensus, the zkevm_contracts_image should be \"leovct/zkevm-contracts:v10.0.0-rc.3-fork.12\". Changing...".format(
-                    args["consensus_contract_type"]
-                )
-            )
-            args[
-                "zkevm_contracts_image"
-            ] = "leovct/zkevm-contracts:v10.0.0-rc.3-fork.12"
-
     # FIXME - I've removed some code here that was doing some logic to
     # update the vkeys depending on the consensus. We either need to
     # have different vkeys depending on the context (e.g. if we're
@@ -875,83 +892,3 @@ def validate_consensus_type(consensus_type):
                 consensus_type, VALID_CONSENSUS_TYPES
             )
         )
-
-
-def validate_vkeys(plan, args, deployment_stages):
-    consensus_type = args.get("consensus_contract_type")
-
-    # For rollup and cdk-validium consensus, ensure the pp vkey is set to the zero hash.
-    if consensus_type in [
-        constants.CONSENSUS_TYPE.rollup,
-        constants.CONSENSUS_TYPE.cdk_validium,
-    ]:
-        pp_vkey = args.get("pp_vkey_hash")
-        if pp_vkey != constants.ZERO_HASH:
-            fail(
-                "For rollup and cdk-validium consensus, the pp_vkey_hash must be set to '{}', but got '{}'.".format(
-                    constants.ZERO_HASH, pp_vkey
-                )
-            )
-
-    # For pessimistic consensus, ensure the pp vkey matches the value returned by the agglayer binary.
-    # Only validate the aggchain vkey if an OP rollup is deployed.
-    if consensus_type == constants.CONSENSUS_TYPE.pessimistic:
-        validate_pp_vkey_with_binary(
-            plan,
-            pp_vkey=args.get("pp_vkey_hash"),
-            agglayer_image=args.get("agglayer_image"),
-        )
-
-        if deployment_stages.get("deploy_optimism_rollup", False):
-            validate_aggchain_vkey_with_binary(
-                plan,
-                aggchain_vkey=args.get("aggchain_vkey_hash"),
-                aggkit_prover_image=args.get("aggkit_prover_image"),
-            )
-
-    # For aggchain consensus, ensure the vkeys match the expected values returned by the binaries.
-    if consensus_type in [
-        constants.CONSENSUS_TYPE.ecdsa,
-        constants.CONSENSUS_TYPE.fep,
-    ]:
-        validate_pp_vkey_with_binary(
-            plan,
-            pp_vkey=args.get("pp_vkey_hash"),
-            agglayer_image=args.get("agglayer_image"),
-        )
-        validate_aggchain_vkey_with_binary(
-            plan,
-            aggchain_vkey=args.get("aggchain_vkey_hash"),
-            aggkit_prover_image=args.get("aggkit_prover_image"),
-        )
-
-
-def validate_pp_vkey_with_binary(plan, pp_vkey, agglayer_image):
-    result = plan.run_sh(
-        name="agglayer-vkey-getter",
-        description="Getting agglayer vkey",
-        image=agglayer_image,
-        run="agglayer vkey | tr -d '\n'",
-    )
-    plan.verify(
-        description="Verifying agglayer vkey",
-        value=result.output,
-        assertion="==",
-        target_value=pp_vkey,
-    )
-
-
-def validate_aggchain_vkey_with_binary(plan, aggchain_vkey, aggkit_prover_image):
-    result = plan.run_sh(
-        name="aggkit-prover-vkey-getter",
-        description="Getting aggkit prover vkey",
-        image=aggkit_prover_image,
-        run="aggkit-prover vkey | tr -d '\n'",
-    )
-    plan.verify(
-        description="Verifying aggkit prover vkey",
-        # FIXME: At some point in the future, the aggchain vkey hash will probably come prefixed with 0x and we'll need to fix this.
-        value="0x{}".format(result.output),
-        assertion="==",
-        target_value=aggchain_vkey,
-    )

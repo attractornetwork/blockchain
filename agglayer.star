@@ -167,6 +167,7 @@ def create_agglayer_config_artifact(
                     "zkevm_l2_sovereignadmin_address": args[
                         "zkevm_l2_sovereignadmin_address"
                     ],
+                    "consensus_contract_type": args["consensus_contract_type"],
                 }
                 | contract_setup_addresses
                 | db_configs,
@@ -203,7 +204,7 @@ def get_agglayer_ports(args):
         )
         if args["agglayer_admin_port"] != 0:
             ports["aglr-admin"] = PortSpec(
-                args["agglayer_admin_port"], application_protocol="grpc"
+                args["agglayer_admin_port"], application_protocol="http"
             )
     public_ports = ports_package.get_public_ports(ports, "agglayer_start_port", args)
     return (ports, public_ports)

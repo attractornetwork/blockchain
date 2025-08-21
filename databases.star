@@ -10,7 +10,6 @@ USE_REMOTE_POSTGRES = False
 POSTGRES_HOSTNAME = "127.0.0.1"
 
 # Mostly static params unless user has specialized postgres configuration
-POSTGRES_IMAGE = "postgres:16.2"
 POSTGRES_SERVICE_NAME = "postgres"
 POSTGRES_PORT = 5432
 
@@ -90,7 +89,22 @@ CDK_ERIGON_DBS = {
     }
 }
 
-DATABASES = CENTRAL_ENV_DBS | PROVER_DB | ZKEVM_NODE_DBS | CDK_ERIGON_DBS
+# Databases required for op-succinct proposer.
+OP_SUCCINCT_PROPOSER_DBS = {
+    "op_succinct_db": {
+        "name": "op_succinct_db",
+        "user": "op_succinct_user",
+        "password": "op_succinct_password",
+    }
+}
+
+DATABASES = (
+    CENTRAL_ENV_DBS
+    | PROVER_DB
+    | ZKEVM_NODE_DBS
+    | CDK_ERIGON_DBS
+    | OP_SUCCINCT_PROPOSER_DBS
+)
 
 
 def run(plan, args):
@@ -102,7 +116,7 @@ def run(plan, args):
 def get_db_configs(suffix, sequencer_type):
     dbs = None
     if sequencer_type == "erigon":
-        dbs = CENTRAL_ENV_DBS | PROVER_DB | CDK_ERIGON_DBS
+        dbs = CENTRAL_ENV_DBS | PROVER_DB | CDK_ERIGON_DBS | OP_SUCCINCT_PROPOSER_DBS
     elif sequencer_type == "zkevm":
         dbs = CENTRAL_ENV_DBS | PROVER_DB | ZKEVM_NODE_DBS
     else:
@@ -167,7 +181,7 @@ def create_postgres_service(plan, db_configs, args, start_port_name):
 
     (ports, public_ports) = get_database_ports(args, start_port_name)
     postgres_service_cfg = ServiceConfig(
-        image=POSTGRES_IMAGE,
+        image=args.get("db_image"),
         ports=ports,
         public_ports=public_ports,
         env_vars={

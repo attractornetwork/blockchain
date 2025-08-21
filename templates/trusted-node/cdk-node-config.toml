@@ -27,8 +27,7 @@ SequencerPrivateKeyPassword  = "{{.zkevm_l2_keystore_password}}"
 AggregatorPrivateKeyPath = "{{or .zkevm_l2_aggregator_keystore_file "/etc/cdk/aggregator.keystore"}}"
 AggregatorPrivateKeyPassword  = "{{.zkevm_l2_keystore_password}}"
 SenderProofToL1Addr = "{{.zkevm_l2_agglayer_address}}"   
-polygonBridgeAddr = "{{.zkevm_bridge_address}}" 
-
+polygonBridgeAddr = "{{.zkevm_bridge_address}}"
 
 RPCURL = "http://{{.l2_rpc_name}}{{.deployment_suffix}}:{{.zkevm_rpc_http_port}}"
 WitnessURL = "http://{{.l2_rpc_name}}{{.deployment_suffix}}:{{.zkevm_rpc_http_port}}"
@@ -54,8 +53,8 @@ Outputs = ["stderr"]
 
 [Aggregator]
         Port = "{{.zkevm_aggregator_port}}"
-        RetryTime = "3600s"
-        VerifyProofInterval = "3600s"
+        RetryTime = "30s"
+        VerifyProofInterval = "10s"
         GasOffset = 150000
         SettlementBackend = "agglayer"
         [Aggregator.DB]
@@ -68,5 +67,21 @@ Outputs = ["stderr"]
                 MaxConns = 200
        
 [AggSender]
-CertificateSendInterval = "120m"
-CheckSettledInterval = "3600s"
+CertificateSendInterval = "1m"
+CheckSettledInterval = "5s"
+
+[ClaimSponsor]
+DBPath = "{{.zkevm_path_rw_data}}/claimsponsor.sqlite"
+Enabled = "{{.enable_aggkit_claim_sponsor}}"
+SenderAddr = "{{.zkevm_l2_claimsponsor_address}}"
+BridgeAddrL2 = "{{.zkevm_bridge_l2_address}}"
+
+[ClaimSponsor.EthTxManager]
+PrivateKeys = [
+    {Path = "/etc/cdk/claimsponsor.keystore", Password = "{{.zkevm_l2_keystore_password}}"},
+]
+StoragePath = "{{.zkevm_path_rw_data}}/ethtxmanager-claimsponsor.sqlite"
+
+[ClaimSponsor.EthTxManager.Etherman]
+URL = "http://{{.l2_rpc_name}}{{.deployment_suffix}}:{{.zkevm_rpc_http_port}}"
+L1ChainID = "{{.zkevm_rollup_chain_id}}"

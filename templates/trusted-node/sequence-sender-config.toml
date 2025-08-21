@@ -5,8 +5,8 @@ Outputs = ["stdout"]
 
 [SequenceSender]
 IsValidiumMode={{.zkevm_is_validium}}
-WaitPeriodSendSequence = "86400s"
-LastBatchVirtualizationTimeMaxWaitPeriod = "720h"
+WaitPeriodSendSequence = "15s"
+LastBatchVirtualizationTimeMaxWaitPeriod = "10s"
 MaxTxSizeForL1 = 131072
 L2Coinbase =  "{{.zkevm_l2_sequencer_address}}"
 PrivateKey = {Path = "/etc/zkevm/sequencer.keystore", Password = "{{.zkevm_l2_keystore_password}}"}
@@ -16,11 +16,11 @@ MaxPendingTx = 1
 	[SequenceSender.StreamClient]
 		Server = "{{.sequencer_name}}{{.deployment_suffix}}:{{.zkevm_data_streamer_port}}"
 	[SequenceSender.EthTxManager]
-		FrequencyToMonitorTxs = "86400s"
-		WaitTxToBeMined = "12h"
+		FrequencyToMonitorTxs = "1s"
+		WaitTxToBeMined = "2m"
 		ConsolidationL1ConfirmationBlocks = 5
 		FinalizationL1ConfirmationBlocks = 10
-		WaitReceiptToBeGenerated = "3600s"
+		WaitReceiptToBeGenerated = "8s"
 		PrivateKeys = [
 			{Path = "/etc/zkevm/sequencer.keystore", Password = "{{.zkevm_l2_keystore_password}}"},
 		]

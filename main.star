@@ -1,26 +1,26 @@
 constants = import_module("./src/package_io/constants.star")
 input_parser = import_module("./input_parser.star")
 service_package = import_module("./lib/service.star")
+op_succinct_package = import_module("./op_succinct.star")
+deploy_sovereign_contracts_package = import_module("./deploy_sovereign_contracts.star")
+aggkit_package = import_module("./aggkit.star")
+ethereum_package = import_module("./ethereum.star")
 
 # Main service packages.
 additional_services = import_module("./src/additional_services/launcher.star")
 agglayer_package = "./agglayer.star"
 cdk_bridge_infra_package = "./cdk_bridge_infra.star"
 cdk_central_environment_package = "./cdk_central_environment.star"
-aggkit_package = "./aggkit.star"
 cdk_erigon_package = "./cdk_erigon.star"
 databases_package = "./databases.star"
-deploy_zkevm_contracts_package = "./deploy_zkevm_contracts.star"
-ethereum_package = "./ethereum.star"
+deploy_agglayer_contracts_package = "./deploy_agglayer_contracts.star"
 anvil_package = "./anvil.star"
 zkevm_pool_manager_package = "./zkevm_pool_manager.star"
 deploy_l2_contracts_package = "./deploy_l2_contracts.star"
-deploy_sovereign_contracts_package = "./deploy_sovereign_contracts.star"
 create_sovereign_predeployed_genesis_package = (
     "./create_sovereign_predeployed_genesis.star"
 )
 mitm_package = "./mitm.star"
-op_succinct_package = "./op_succinct.star"
 
 
 def run(plan, args={}):
@@ -39,25 +39,32 @@ def run(plan, args={}):
         if args.get("l1_engine", "geth") == "anvil":
             import_module(anvil_package).run(plan, args)
         else:
-            import_module(ethereum_package).run(plan, args)
+            ethereum_package.run(plan, args)
     else:
         plan.print("Skipping the deployment of a local L1")
+    # Extract the fetch-rollup-config binary before starting contracts-001 service.
+    if deployment_stages.get("deploy_op_succinct", False):
+        # Extract genesis to feed into evm-sketch-genesis
+        # ethereum_package.extract_genesis_json(plan)
+        # Temporarily run op-succinct-proposer service and fetch-rollup-config binary
+        # The extract binary will be passed into the contracts-001 service
+        op_succinct_package.extract_fetch_rollup_config(plan, args)
 
     # Deploy Contracts on L1.
     contract_setup_addresses = {}
     sovereign_contract_setup_addresses = {}
-    if deployment_stages.get("deploy_zkevm_contracts_on_l1", False):
-        plan.print("Deploying zkevm contracts on L1")
-        import_module(deploy_zkevm_contracts_package).run(
+    if deployment_stages.get("deploy_agglayer_contracts_on_l1", False):
+        plan.print("Deploying agglayer contracts on L1")
+        import_module(deploy_agglayer_contracts_package).run(
             plan, args, deployment_stages, op_stack_args
         )
 
         if deployment_stages.get("deploy_optimism_rollup", False):
-            # Deploy Sovereign contracts (maybe a better name is creating soverign rollup)
+            # Deploy Sovereign contracts (maybe a better name is creating sovereign rollup)
             # TODO rename this and understand what this does in the case where there are predeployed contracts
             # TODO Call the create rollup script
             plan.print("Creating new rollup type and creating rollup on L1")
-            import_module(deploy_sovereign_contracts_package).run(
+            deploy_sovereign_contracts_package.run(
                 plan, args, op_stack_args["predeployed_contracts"]
             )
 
@@ -72,39 +79,52 @@ def run(plan, args={}):
             op_deployer_configs_artifact = plan.get_files_artifact(
                 name="op-deployer-configs",
             )
+
+            # Fund OP Addresses on L1
             l1_op_contract_addresses = service_package.get_l1_op_contract_addresses(
                 plan, args, op_deployer_configs_artifact
             )
 
-            import_module(deploy_sovereign_contracts_package).fund_addresses(
-                plan, args, l1_op_contract_addresses
+            deploy_sovereign_contracts_package.fund_addresses(
+                plan, args, l1_op_contract_addresses, args["l1_rpc_url"]
+            )
+
+            # Fund Kurtosis addresses on OP L2
+            l2_kurtosis_addresses = service_package.get_kurtosis_addresses(args)
+
+            deploy_sovereign_contracts_package.fund_addresses(
+                plan, args, l2_kurtosis_addresses, args["op_el_rpc_url"]
             )
 
             if deployment_stages.get("deploy_op_succinct", False):
-                plan.print("Deploying op-succinct contract deployer helper component")
-                import_module(op_succinct_package).op_succinct_contract_deployer_run(
-                    plan, args
+                # Extract genesis to feed into evm-sketch-genesis
+                op_succinct_package.create_evm_sketch_genesis(plan, args)
+
+                # Run deploy-op-succinct-contracts.sh script in the contracts-001 service
+                plan.exec(
+                    description="Deploying op-succinct contracts",
+                    service_name="contracts" + args["deployment_suffix"],
+                    recipe=ExecRecipe(
+                        command=[
+                            "/bin/bash",
+                            "-c",
+                            "cp /opt/scripts/deploy-op-succinct-contracts.sh /opt/op-succinct/ && chmod +x {0} && {0}".format(
+                                "/opt/op-succinct/deploy-op-succinct-contracts.sh"
+                            ),
+                        ]
+                    ),
                 )
-                # plan.print("Deploying SP1 Verifier Contracts for OP Succinct")
-                # import_module(op_succinct_package).sp1_verifier_contracts_deployer_run(
-                #     plan, args
-                # )
-                plan.print(
-                    "Extracting environment variables from the contract deployer"
-                )
+                plan.print("Extracting environment variables for op-succinct")
                 op_succinct_env_vars = service_package.get_op_succinct_env_vars(
                     plan, args
                 )
                 args = args | op_succinct_env_vars
-
-                # plan.print("Deploying L2OO for OP Succinct")
-                # import_module(op_succinct_package).op_succinct_l2oo_deployer_run(plan, args)
                 l2oo_vars = service_package.get_op_succinct_l2oo_config(plan, args)
                 args = args | l2oo_vars
 
             # TODO/FIXME this might break PP. We need to make sure that this process can work with PP and FEP. If it can work with PP, then we need to remove the dependency on l2oo (i think)
             plan.print("Initializing rollup")
-            import_module(deploy_sovereign_contracts_package).init_rollup(
+            deploy_sovereign_contracts_package.init_rollup(
                 plan, args, deployment_stages
             )
             # Extract Sovereign contract addresses
@@ -116,7 +136,7 @@ def run(plan, args={}):
             plan, args, deployment_stages
         )
     else:
-        plan.print("Skipping the deployment of zkevm contracts on L1")
+        plan.print("Skipping the deployment of agglayer contracts on L1")
 
     # Deploy helper service to retrieve rollup data from rollup manager contract.
     if (
@@ -213,9 +233,30 @@ def run(plan, args={}):
 
             plan.print("Deploying cdk central/trusted environment")
             args["genesis_artifact"] = genesis_artifact
-            import_module(cdk_central_environment_package).run(
-                plan, args, deployment_stages, contract_setup_addresses
-            )
+
+            if (
+                args["consensus_contract_type"] == constants.CONSENSUS_TYPE.rollup
+                or args["consensus_contract_type"]
+                == constants.CONSENSUS_TYPE.cdk_validium
+            ):
+                plan.print("Deploying CDK Node infrastructure")
+                import_module(cdk_central_environment_package).run(
+                    plan, args, deployment_stages, contract_setup_addresses
+                )
+            else:
+                plan.print("Skipping the deployment of CDK Node")
+
+            # Deploy AggKit infrastructure + Dedicated Bridge Service
+            if deployment_stages.get("deploy_aggkit_node", False):
+                plan.print("Deploying AggKit infrastructure")
+                import_module(aggkit_package).run_aggkit_cdk_node(
+                    plan,
+                    args,
+                    contract_setup_addresses,
+                    deployment_stages,
+                )
+            else:
+                plan.print("Skipping the deployment of aggkit infrastructure")
 
             # Deploy contracts on L2.
             plan.print("Deploying contracts on L2")
@@ -223,11 +264,15 @@ def run(plan, args={}):
             import_module(deploy_l2_contracts_package).run(
                 plan, args, deploy_l2_contracts
             )
+
         else:
             plan.print("Skipping the deployment of cdk central/trusted environment")
 
-        # Deploy cdk/bridge infrastructure.
-        if deployment_stages.get("deploy_cdk_bridge_infra", False):
+        # Deploy cdk/bridge infrastructure only if using CDK Node instead of Aggkit. This can be inferred by the consensus_contract_type.
+        if deployment_stages.get("deploy_cdk_bridge_infra", False) and (
+            args["consensus_contract_type"] == constants.CONSENSUS_TYPE.rollup
+            or args["consensus_contract_type"] == constants.CONSENSUS_TYPE.cdk_validium
+        ):
             plan.print("Deploying cdk/bridge infrastructure")
             import_module(cdk_bridge_infra_package).run(
                 plan,
@@ -241,10 +286,23 @@ def run(plan, args={}):
         else:
             plan.print("Skipping the deployment of cdk/bridge infrastructure")
 
+    # Deploy OP Succinct.
+    if deployment_stages.get("deploy_op_succinct", False):
+        # Run op-succinct-proposer service
+        plan.print("Running the op-succinct-proposer service")
+        op_succinct_package.op_succinct_proposer_run(
+            plan, args | contract_setup_addresses
+        )
+    else:
+        plan.print("Skipping the deployment of OP Succinct")
+
     # Deploy AggKit infrastructure + Dedicated Bridge Service
-    if deployment_stages.get("deploy_optimism_rollup", False):
+    if deployment_stages.get("deploy_optimism_rollup", False) or (
+        deployment_stages.get("deploy_cdk_central_environment", False)
+        and args["consensus_contract_type"] == constants.CONSENSUS_TYPE.pessimistic
+    ):
         plan.print("Deploying AggKit infrastructure")
-        import_module(aggkit_package).run(
+        aggkit_package.run(
             plan,
             args,
             contract_setup_addresses,
@@ -252,42 +310,16 @@ def run(plan, args={}):
             deployment_stages,
         )
     else:
-        plan.print("Skipping the deployment of an Optimism rollup")
-
-    # Deploy OP Succinct.
-    if deployment_stages.get("deploy_op_succinct", False):
-        plan.print("Extracting environment variables from the contract deployer")
-        op_succinct_env_vars = service_package.get_op_succinct_env_vars(plan, args)
-        args = args | op_succinct_env_vars
-
-        plan.print("Deploying op-succinct-server component")
-        import_module(op_succinct_package).op_succinct_server_run(
-            plan, args, op_succinct_env_vars
-        )
-        plan.print("Deploying op-succinct-proposer component")
-        import_module(op_succinct_package).op_succinct_proposer_run(
-            plan, args | contract_setup_addresses, op_succinct_env_vars
-        )
-        # Stop the op-succinct-contract-deployer service after we're done using it.
-        service_name = "op-succinct-contract-deployer" + args["deployment_suffix"]
-        plan.stop_service(
-            name=service_name,
-            description="Stopping the {0} service after finishing with the initial op-succinct setup.".format(
-                service_name
-            ),
-        )
-    else:
-        plan.print("Skipping the deployment of OP Succinct")
+        plan.print("Skipping the deployment of aggkit infrastructure")
 
     # Deploy additional services.
-    deploy_optimism_rollup = deployment_stages.get("deploy_optimism_rollup", False)
     additional_services.launch(
         plan,
         args,
         contract_setup_addresses,
         sovereign_contract_setup_addresses,
         genesis_artifact,
-        deploy_optimism_rollup,
+        deployment_stages,
     )
 
 
